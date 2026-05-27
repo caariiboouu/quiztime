@@ -113,8 +113,8 @@
     },
     {
       "id": "geography",
-      "name": "Geography",
-      "description": "Places, flags, and capitals.",
+      "name": "Rx Maintenance",
+      "description": "No doctors? No dentists? No paperwork?",
       "questions": [
         {
           "id": "geo-1",
