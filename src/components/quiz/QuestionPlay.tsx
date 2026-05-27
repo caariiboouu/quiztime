@@ -73,7 +73,7 @@ export function QuestionPlay({
 
   const handleContinueToFactoid = useCallback(() => {
     if (phase !== "result") return;
-    if (question.factoid || question.factoidImage) {
+    if (question.factoid && question.factoid.trim()) {
       setPhase("factoid");
     } else {
       clearPersisted();
