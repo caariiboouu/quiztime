@@ -38,15 +38,27 @@
       "questions": [
         {
           "id": "pop-1",
-          "question": "Which movie won Best Picture at the 2024 Academy Awards?",
+          "question": "Robinson Curusoe is based on the real person, Alexander Selkirk who survived alone on an island for four years and four months in the early 1700's. How did he get stranded there?",
           "answers": [
-            { "id": "a", "text": "Oppenheimer" },
-            { "id": "b", "text": "Barbie" },
-            { "id": "c", "text": "Killers of the Flower Moon" },
-            { "id": "d", "text": "Poor Things" }
+            {
+              "id": "a",
+              "text": "He survived a pirate attack and landed there as the sole survivor."
+            },
+            {
+              "id": "b",
+              "text": "He requested to remain on the island after deciding their vessel was not seaworthy."
+            },
+            {
+              "id": "c",
+              "text": "He was marooned by the Spanish Navy for assisting smugglers."
+            },
+            {
+              "id": "d",
+              "text": "He escaped a mutiny after his crew decided they could find Atlantis."
+            }
           ],
-          "correctAnswerId": "a",
-          "factoid": "Oppenheimer also took home awards for Best Director (Christopher Nolan), Best Actor (Cillian Murphy), and Best Supporting Actor (Robert Downey Jr.)."
+          "correctAnswerId": "b",
+          "factoid": "He begged to be let back on board as they were leaving, but the ship actually did sink a short time later."
         },
         {
           "id": "pop-2",
@@ -96,33 +108,45 @@
       ]
     },
     {
-      "id": "science",
-      "name": "Science & Nature",
-      "description": "From atoms to animals.",
+      "id": "joel",
+      "name": "Joel's Double Points Lightning Round Questions",
+      "description": "",
       "questions": [
         {
-          "id": "sci-1",
-          "question": "How many bones are in the adult human body?",
+          "id": "joel-1",
+          "question": "In the comic stip Calvin and Hobbes, what was the occupation of Calvin's father?",
           "answers": [
-            { "id": "a", "text": "186" },
-            { "id": "b", "text": "206" },
-            { "id": "c", "text": "226" },
-            { "id": "d", "text": "246" }
+            { "id": "a", "text": "An Accountant" },
+            { "id": "b", "text": "A Phlebotomist" },
+            { "id": "c", "text": "A Binocular Company CEO" },
+            { "id": "d", "text": "A Patent Lawyer" }
           ],
-          "correctAnswerId": "b",
-          "factoid": "Babies are actually born with about 270 bones — many of them fuse together as we grow."
+          "correctAnswerId": "d",
+          "factoid": "This is revealed in only one strip where his father reads him the patent information at his desk as a sardonic 'story' over the phone."
         },
         {
-          "id": "sci-2",
-          "question": "Which planet has the most moons?",
+          "id": "joel-2",
+          "question": "What is the east-west highway that leads to (now closed) Crossroads Theater?",
           "answers": [
-            { "id": "a", "text": "Jupiter" },
-            { "id": "b", "text": "Saturn" },
-            { "id": "c", "text": "Uranus" },
-            { "id": "d", "text": "Neptune" }
+            { "id": "a", "text": "I-240" },
+            { "id": "b", "text": "I-40" },
+            { "id": "c", "text": "I-44" },
+            { "id": "d", "text": "I-344" }
           ],
-          "correctAnswerId": "b",
-          "factoid": "Saturn overtook Jupiter in 2023 when astronomers confirmed 62 new moons, bringing its total to 146."
+          "correctAnswerId": "a",
+          "factoid": "When I was 16 I tried to meet my friend at Crossroads to see Spider Man, I got on the wrong highway and ended up in Yukon"
+        },
+        {
+          "id": "joel-3",
+          "question": "What is the east-west highway that leads to (now closed) Crossroads Theater?",
+          "answers": [
+            { "id": "a", "text": "I-240" },
+            { "id": "b", "text": "I-40" },
+            { "id": "c", "text": "I-44" },
+            { "id": "d", "text": "I-344" }
+          ],
+          "correctAnswerId": "a",
+          "factoid": "When I was 16 I tried to meet my friend at Crossroads to see Spider Man, I got on the wrong highway and ended up in Yukon"
         }
       ]
     }

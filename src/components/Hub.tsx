@@ -9,7 +9,7 @@ type HubProps = {
 export function Hub({ onSelectGame }: HubProps) {
   return (
     <div className="flex h-full flex-col">
-      <NavBar title="Quiz Time" />
+      <NavBar title="Survivor: Benefits Battleground" />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
         <h2 className="mb-2 text-3xl font-semibold tracking-tight text-neutral-900">
           Pick a game
