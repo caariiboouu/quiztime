@@ -2,15 +2,27 @@ import type { Game } from "../types";
 
 export const GAMES: Game[] = [
   {
-    id: "quiz",
-    name: "Quiz Show",
-    description: "Pick a category, answer a random question, win a chance at glory.",
+    id: "cookie-face",
+    name: "Cookie Face",
+    description: "Cookie on forehead, mouth as the goal, no hands.",
     available: true,
   },
   {
-    id: "placeholder",
-    name: "Coming Soon",
-    description: "Another game slot — drop a new component in to plug it in.",
-    available: false,
+    id: "carrot-in-a-box",
+    name: "Carrot in a Box",
+    description: "Two boxes, one carrot, all the bluffing.",
+    available: true,
+  },
+  {
+    id: "af-trivia",
+    name: "AF Trivia",
+    description: "Random trivia, one question at a time.",
+    available: true,
+  },
+  {
+    id: "mystery-quiz",
+    name: "???",
+    description: "The main event. Pick a category, win a question.",
+    available: true,
   },
 ];

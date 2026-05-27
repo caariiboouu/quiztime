@@ -18,7 +18,9 @@ type QuizGameProps = {
 
 export function QuizGame({ onExit }: QuizGameProps) {
   const data = quizData as QuizData;
-  const { answered, markAnswered, unanswer, clearAll } = useAnsweredQuestions();
+  const { answered, markAnswered, unanswer, clearAll } = useAnsweredQuestions(
+    "quiztime.answered.quiz",
+  );
   const [view, setView] = useState<View>({ kind: "categories" });
 
   const categories = useMemo(() => data.categories, [data]);
@@ -42,10 +44,10 @@ export function QuizGame({ onExit }: QuizGameProps) {
 
   const headerTitle =
     view.kind === "play"
-      ? "Quiz Show"
+      ? "???"
       : view.kind === "answered"
         ? "Answered"
-        : "Quiz Show";
+        : "???";
 
   const navBack =
     view.kind === "categories"

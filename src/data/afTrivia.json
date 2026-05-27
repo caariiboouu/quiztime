@@ -1,0 +1,28 @@
+{
+  "questions": [
+    {
+      "id": "af-1",
+      "question": "Replace me — what's a fun AF trivia question?",
+      "answers": [
+        { "id": "a", "text": "Answer A" },
+        { "id": "b", "text": "Answer B" },
+        { "id": "c", "text": "Answer C" },
+        { "id": "d", "text": "Answer D" }
+      ],
+      "correctAnswerId": "a",
+      "factoid": "A little explanation goes here."
+    },
+    {
+      "id": "af-2",
+      "question": "Another AF trivia placeholder — swap in real content.",
+      "answers": [
+        { "id": "a", "text": "One" },
+        { "id": "b", "text": "Two" },
+        { "id": "c", "text": "Three" },
+        { "id": "d", "text": "Four" }
+      ],
+      "correctAnswerId": "c",
+      "factoid": "Tell them why."
+    }
+  ]
+}

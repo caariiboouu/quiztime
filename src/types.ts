@@ -25,7 +25,11 @@ export type QuizData = {
   categories: Category[];
 };
 
-export type GameId = "quiz" | "placeholder";
+export type GameId = "cookie-face" | "carrot-in-a-box" | "af-trivia" | "mystery-quiz";
+
+export type TriviaData = {
+  questions: Question[];
+};
 
 export type Game = {
   id: GameId;

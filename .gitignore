@@ -14,10 +14,9 @@ dist-ssr
 
 # Playwright test artifacts (from local verification)
 .playwright-mcp/
-hub.png
-categories.png
-q-*.png
-answered.png
+*.png
+!public/*.png
+!src/**/*.png
 
 # Editor directories and files
 .vscode/*

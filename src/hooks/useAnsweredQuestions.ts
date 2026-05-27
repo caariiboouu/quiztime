@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 
-const STORAGE_KEY = "quiztime.answered";
-
 export type AnsweredRecord = {
   questionId: string;
   categoryId: string;
@@ -11,9 +9,9 @@ export type AnsweredRecord = {
 
 export type AnsweredMap = Record<string, AnsweredRecord>;
 
-function load(): AnsweredMap {
+function load(storageKey: string): AnsweredMap {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey);
     if (!raw) return {};
     return JSON.parse(raw) as AnsweredMap;
   } catch {
@@ -21,16 +19,16 @@ function load(): AnsweredMap {
   }
 }
 
-function save(map: AnsweredMap) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+function save(storageKey: string, map: AnsweredMap) {
+  localStorage.setItem(storageKey, JSON.stringify(map));
 }
 
-export function useAnsweredQuestions() {
-  const [answered, setAnswered] = useState<AnsweredMap>(() => load());
+export function useAnsweredQuestions(storageKey: string) {
+  const [answered, setAnswered] = useState<AnsweredMap>(() => load(storageKey));
 
   useEffect(() => {
-    save(answered);
-  }, [answered]);
+    save(storageKey, answered);
+  }, [storageKey, answered]);
 
   const markAnswered = useCallback(
     (questionId: string, categoryId: string, correct: boolean) => {
