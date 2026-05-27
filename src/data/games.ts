@@ -22,7 +22,7 @@ export const GAMES: Game[] = [
   {
     id: "mystery-quiz",
     name: "???",
-    description: "The main event. Pick a category, win a question.",
+    description: "The main event.",
     available: true,
   },
 ];
