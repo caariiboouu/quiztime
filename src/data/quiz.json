@@ -2,8 +2,8 @@
   "categories": [
     {
       "id": "company",
-      "name": "Around the Office",
-      "description": "How well do you know our department?",
+      "name": "Enduring the Cold",
+      "description": "There's worse things than being on a tropical island.",
       "questions": [
         {
           "id": "company-1",
@@ -57,8 +57,8 @@
     },
     {
       "id": "pop-culture",
-      "name": "Pop Culture",
-      "description": "Movies, TV, music, and the internet.",
+      "name": "Pop Culture Foraging",
+      "description": "Persistence in Movies, TV, music, and the internet.",
       "questions": [
         {
           "id": "pop-1",
@@ -169,8 +169,8 @@
     },
     {
       "id": "joel",
-      "name": "Joel's Double Points Lightning Round Questions",
-      "description": "",
+      "name": "Joel's Double-Points Lightning Round Questions",
+      "description": "Maybe easy! Maybe hard!",
       "questions": [
         {
           "id": "joel-1",
@@ -245,6 +245,12 @@
           "factoid": "When I was 16 I tried to meet my friend at Crossroads to see Spider Man, I got on the wrong highway and ended up in Yukon"
         }
       ]
+    },
+    {
+      "id": "ceramic-duck-steal-mpoc0mrf",
+      "name": "Ceramic Duck Hunt",
+      "description": "One special question to claim custodianship of the duck regardless of what team wins. Also grants a point.",
+      "questions": []
     }
   ]
 }
