@@ -6,52 +6,23 @@
       "description": "There's worse things than being on a tropical island.",
       "questions": [
         {
-          "id": "company-1",
-          "question": "What year was our department originally formed???",
-          "answers": [
-            {
-              "id": "a",
-              "text": "2008"
-            },
-            {
-              "id": "b",
-              "text": "2012"
-            },
-            {
-              "id": "c",
-              "text": "2015"
-            },
-            {
-              "id": "d",
-              "text": "2019"
-            }
-          ],
-          "correctAnswerId": "b",
-          "factoid": "The department was originally formed as a small pilot team and grew to its current size over the next decade."
-        },
-        {
           "id": "company-2",
-          "question": "Which of these is NOT one of our department's core values?",
+          "question": "Survivalists often cite 'The Rules of 3' for extreme conditions like freezing cold. What are they?",
           "answers": [
             {
               "id": "a",
-              "text": "Curiosity"
+              "text": "walk 3 miles in any any direction, find 3 meals, yell 3 times, climb 3 trees"
             },
             {
               "id": "b",
-              "text": "Accountability"
+              "text": "dig three feet underground, 3 feet of wood or rocks on top, 3 fires to stay extra warm"
             },
             {
               "id": "c",
-              "text": "Synergy"
-            },
-            {
-              "id": "d",
-              "text": "Craftsmanship"
+              "text": "3 minutes without air or in icy water, 3 hours without shelter, 3 days without water, 3 weeks without food"
             }
           ],
-          "correctAnswerId": "c",
-          "factoid": "We deliberately avoided buzzwords like 'synergy' when defining the values — the goal was to pick words that meant something specific."
+          "correctAnswerId": "c"
         }
       ]
     },
