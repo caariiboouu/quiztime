@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import bundledQuiz from "../../data/quiz.json";
 import bundledTrivia from "../../data/afTrivia.json";
 import type { QuizData, TriviaData } from "../../types";
@@ -8,15 +8,18 @@ import { QUIZ_OVERRIDE_KEY } from "../quiz/QuizGame";
 import { TRIVIA_OVERRIDE_KEY } from "../games/AFTrivia";
 import { QuizEditor } from "./QuizEditor";
 import { TriviaEditor } from "./TriviaEditor";
-import {
-  GithubConnectModal,
-  useGithubAuth,
-  type GithubAuth,
-} from "./GithubConnect";
 import { GithubError, getFile, putFile } from "../../lib/github";
+import {
+  decryptString,
+  encryptString,
+  type EncryptedBlob,
+} from "../../lib/crypto";
 
 const QUIZ_PATH = "src/data/quiz.json";
 const TRIVIA_PATH = "src/data/afTrivia.json";
+const AUTH_PATH = "public/auth.enc.json";
+const AUTH_URL = `${import.meta.env.BASE_URL}auth.enc.json`;
+const TOKEN_SESSION_KEY = "quiztime.admin.token";
 
 type SaveStatus =
   | { state: "idle" }
@@ -24,34 +27,109 @@ type SaveStatus =
   | { state: "success"; message: string }
   | { state: "error"; message: string };
 
-const PASSWORD = "afafafaf";
-const SESSION_KEY = "quiztime.admin.unlocked";
+type Stage =
+  | { kind: "gate" }
+  | { kind: "setup"; password: string }
+  | { kind: "ready"; token: string };
 
 type AdminPanelProps = {
   onExit: () => void;
 };
 
 export function AdminPanel({ onExit }: AdminPanelProps) {
-  const [unlocked, setUnlocked] = useState(
-    () => sessionStorage.getItem(SESSION_KEY) === "1",
-  );
-  if (!unlocked) {
-    return <Gate onExit={onExit} onUnlock={() => setUnlocked(true)} />;
+  const [stage, setStage] = useState<Stage>(() => {
+    const cached = sessionStorage.getItem(TOKEN_SESSION_KEY);
+    return cached ? { kind: "ready", token: cached } : { kind: "gate" };
+  });
+
+  const handleAuthed = useCallback((token: string) => {
+    sessionStorage.setItem(TOKEN_SESSION_KEY, token);
+    setStage({ kind: "ready", token });
+  }, []);
+
+  if (stage.kind === "gate") {
+    return (
+      <Gate
+        onExit={onExit}
+        onAuthed={handleAuthed}
+        onNeedsSetup={(password) => setStage({ kind: "setup", password })}
+      />
+    );
   }
-  return <Inner onExit={onExit} />;
+
+  if (stage.kind === "setup") {
+    return (
+      <Setup
+        password={stage.password}
+        onAuthed={handleAuthed}
+        onBack={() => setStage({ kind: "gate" })}
+      />
+    );
+  }
+
+  return (
+    <Inner
+      token={stage.token}
+      onExit={onExit}
+      onTokenInvalid={() => {
+        sessionStorage.removeItem(TOKEN_SESSION_KEY);
+        setStage({ kind: "gate" });
+      }}
+    />
+  );
 }
 
-function Gate({ onExit, onUnlock }: { onExit: () => void; onUnlock: () => void }) {
+async function fetchAuthBlob(): Promise<EncryptedBlob | null> {
+  const res = await fetch(AUTH_URL, { cache: "no-store" });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Auth fetch failed (${res.status})`);
+  // Dev servers often fall back to index.html for missing files; only accept
+  // real JSON.
+  const text = await res.text();
+  if (!text.trimStart().startsWith("{")) return null;
+  try {
+    return JSON.parse(text) as EncryptedBlob;
+  } catch {
+    return null;
+  }
+}
+
+function Gate({
+  onExit,
+  onAuthed,
+  onNeedsSetup,
+}: {
+  onExit: () => void;
+  onAuthed: (token: string) => void;
+  onNeedsSetup: (password: string) => void;
+}) {
   const [value, setValue] = useState("");
-  const [error, setError] = useState(false);
-  const submit = () => {
-    if (value === PASSWORD) {
-      sessionStorage.setItem(SESSION_KEY, "1");
-      onUnlock();
-    } else {
-      setError(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    if (!value) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const blob = await fetchAuthBlob();
+      if (!blob) {
+        onNeedsSetup(value);
+        return;
+      }
+      const token = await decryptString(value, blob);
+      onAuthed(token);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "OperationError") {
+        setError("Wrong password.");
+      } else {
+        setError(err instanceof Error ? err.message : "Sign-in failed");
+      }
+    } finally {
+      setBusy(false);
     }
   };
+
   return (
     <div className="flex h-full flex-col">
       <NavBar title="Edit content" onBack={onExit} />
@@ -65,24 +143,138 @@ function Gate({ onExit, onUnlock }: { onExit: () => void; onUnlock: () => void }
             value={value}
             onChange={(e) => {
               setValue(e.target.value);
-              setError(false);
+              setError(null);
             }}
             onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
+              if (e.key === "Enter") void submit();
             }}
             autoFocus
             className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-900 focus:border-neutral-500 focus:outline-none"
           />
-          {error && (
-            <p className="mt-2 text-sm text-red-600">Wrong password.</p>
-          )}
+          {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
           <button
             type="button"
-            onClick={submit}
-            className="mt-4 w-full rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800"
+            disabled={busy || !value}
+            onClick={() => void submit()}
+            className="mt-4 w-full rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Unlock
+            {busy ? "Checking…" : "Unlock"}
           </button>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function Setup({
+  password,
+  onAuthed,
+  onBack,
+}: {
+  password: string;
+  onAuthed: (token: string) => void;
+  onBack: () => void;
+}) {
+  const [pat, setPat] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    if (!pat.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const blob = await encryptString(password, pat.trim());
+      const content = JSON.stringify(blob, null, 2) + "\n";
+      const existing = await getFile(pat.trim(), AUTH_PATH);
+      await putFile(
+        pat.trim(),
+        AUTH_PATH,
+        content,
+        "Initialize admin auth blob",
+        existing?.sha,
+      );
+      onAuthed(pat.trim());
+    } catch (err) {
+      if (err instanceof GithubError && err.status === 401) {
+        setError("Token rejected. Verify it has Contents: Read and write on this repo.");
+      } else {
+        setError(err instanceof Error ? err.message : "Setup failed");
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex h-full flex-col">
+      <NavBar title="First-time setup" onBack={onBack} />
+      <main className="mx-auto w-full max-w-lg flex-1 px-6 py-10">
+        <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-2 text-xl font-semibold text-neutral-900">
+            One-time setup
+          </h2>
+          <p className="mb-3 text-sm text-neutral-700">
+            The site doesn't have a commit credential yet. Paste a GitHub personal
+            access token below — it'll be encrypted with the password and saved
+            to the repo. After this, anyone with the password can edit content
+            without needing GitHub.
+          </p>
+          <ol className="mb-4 list-decimal space-y-1 pl-5 text-sm text-neutral-700">
+            <li>
+              Open{" "}
+              <a
+                className="underline"
+                href="https://github.com/settings/personal-access-tokens/new"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                GitHub → fine-grained tokens
+              </a>
+              .
+            </li>
+            <li>
+              Resource owner: your user. Repository access:{" "}
+              <em>Only select repositories → caariiboouu/quiztime</em>.
+            </li>
+            <li>
+              Repository permissions →{" "}
+              <strong>Contents: Read and write</strong>.
+            </li>
+            <li>Generate and paste below (starts with <code>github_pat_</code>).</li>
+          </ol>
+          <input
+            type="password"
+            autoFocus
+            placeholder="github_pat_…"
+            value={pat}
+            onChange={(e) => {
+              setPat(e.target.value);
+              setError(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void submit();
+            }}
+            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none"
+          />
+          {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onBack}
+              className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={busy || !pat.trim()}
+              onClick={() => void submit()}
+              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy ? "Initializing…" : "Initialize"}
+            </button>
+          </div>
         </div>
       </main>
     </div>
@@ -103,7 +295,15 @@ function downloadJson(filename: string, value: unknown) {
   URL.revokeObjectURL(url);
 }
 
-function Inner({ onExit }: { onExit: () => void }) {
+function Inner({
+  token,
+  onExit,
+  onTokenInvalid,
+}: {
+  token: string;
+  onExit: () => void;
+  onTokenInvalid: () => void;
+}) {
   const quiz = useOverridableJson<QuizData>(
     QUIZ_OVERRIDE_KEY,
     bundledQuiz as QuizData,
@@ -115,38 +315,7 @@ function Inner({ onExit }: { onExit: () => void }) {
   const [tab, setTab] = useState<"quiz" | "trivia">("quiz");
   const quizImportRef = useRef<HTMLInputElement>(null);
   const triviaImportRef = useRef<HTMLInputElement>(null);
-  const auth = useGithubAuth();
-  const [showConnect, setShowConnect] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ state: "idle" });
-
-  const saveToRepo = async () => {
-    if (!auth.token) return;
-    const path = tab === "quiz" ? QUIZ_PATH : TRIVIA_PATH;
-    const payload = tab === "quiz" ? quiz.data : trivia.data;
-    const content = JSON.stringify(payload, null, 2) + "\n";
-    setSaveStatus({ state: "saving" });
-    try {
-      const existing = await getFile(auth.token, path);
-      const summary =
-        tab === "quiz"
-          ? `Update ??? quiz content (${(payload as QuizData).categories.length} categories)`
-          : `Update AF Trivia content (${(payload as TriviaData).questions.length} questions)`;
-      const message = `${summary} via admin panel`;
-      await putFile(auth.token, path, content, message, existing?.sha);
-      setSaveStatus({
-        state: "success",
-        message: "Committed — Pages will rebuild in about a minute.",
-      });
-    } catch (err) {
-      let msg = err instanceof Error ? err.message : "Commit failed";
-      if (err instanceof GithubError && err.status === 409) {
-        msg = "Someone else committed first. Refresh the page and re-apply your edits.";
-      } else if (err instanceof GithubError && err.status === 401) {
-        msg = "Token rejected. Disconnect and re-enter a valid token.";
-      }
-      setSaveStatus({ state: "error", message: msg });
-    }
-  };
 
   const handleImport = async (file: File, target: "quiz" | "trivia") => {
     try {
@@ -174,6 +343,33 @@ function Inner({ onExit }: { onExit: () => void }) {
     } else {
       if (confirm("Discard your AF Trivia edits and return to the deployed defaults?"))
         trivia.reset();
+    }
+  };
+
+  const saveToRepo = async () => {
+    const path = tab === "quiz" ? QUIZ_PATH : TRIVIA_PATH;
+    const payload = tab === "quiz" ? quiz.data : trivia.data;
+    const content = JSON.stringify(payload, null, 2) + "\n";
+    setSaveStatus({ state: "saving" });
+    try {
+      const existing = await getFile(token, path);
+      const summary =
+        tab === "quiz"
+          ? `Update ??? quiz content (${(payload as QuizData).categories.length} categories)`
+          : `Update AF Trivia content (${(payload as TriviaData).questions.length} questions)`;
+      await putFile(token, path, content, `${summary} via admin panel`, existing?.sha);
+      setSaveStatus({
+        state: "success",
+        message: "Committed — Pages will rebuild in about a minute.",
+      });
+    } catch (err) {
+      let msg = err instanceof Error ? err.message : "Commit failed";
+      if (err instanceof GithubError && err.status === 409) {
+        msg = "Someone else committed first. Refresh the page and re-apply your edits.";
+      } else if (err instanceof GithubError && err.status === 401) {
+        msg = "The site's stored token is no longer valid. Click 'Re-initialize' to set a new one.";
+      }
+      setSaveStatus({ state: "error", message: msg });
     }
   };
 
@@ -214,10 +410,9 @@ function Inner({ onExit }: { onExit: () => void }) {
                 Unsaved override
               </span>
             )}
-            <GithubAuthControls auth={auth} onConnect={() => setShowConnect(true)} />
             <button
               type="button"
-              disabled={!auth.authed || saveStatus.state === "saving"}
+              disabled={saveStatus.state === "saving"}
               onClick={() => void saveToRepo()}
               className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -226,8 +421,7 @@ function Inner({ onExit }: { onExit: () => void }) {
             <button
               type="button"
               onClick={() => {
-                if (tab === "quiz")
-                  downloadJson("quiz.json", quiz.data);
+                if (tab === "quiz") downloadJson("quiz.json", quiz.data);
                 else downloadJson("afTrivia.json", trivia.data);
               }}
               className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
@@ -278,9 +472,9 @@ function Inner({ onExit }: { onExit: () => void }) {
           </div>
         </div>
         <div className="mx-auto w-full max-w-4xl px-6 pb-3 text-xs text-neutral-500">
-          Edits live in your browser. <strong>Save to repo</strong> commits to
-          GitHub and the site rebuilds in about a minute; <strong>Export</strong>
-          downloads the file if you'd rather commit manually.
+          Edits live in your browser. <strong>Save to repo</strong> commits the
+          active tab and triggers a redeploy; other editors see the change on
+          their next page load (~1 min).
         </div>
         {saveStatus.state === "success" && (
           <div className="border-t border-green-200 bg-green-50 px-6 py-2 text-sm text-green-900">
@@ -288,57 +482,26 @@ function Inner({ onExit }: { onExit: () => void }) {
           </div>
         )}
         {saveStatus.state === "error" && (
-          <div className="border-t border-red-200 bg-red-50 px-6 py-2 text-sm text-red-900">
-            {saveStatus.message}
+          <div className="flex items-center justify-between gap-3 border-t border-red-200 bg-red-50 px-6 py-2 text-sm text-red-900">
+            <span>{saveStatus.message}</span>
+            {saveStatus.message.includes("Re-initialize") && (
+              <button
+                type="button"
+                onClick={onTokenInvalid}
+                className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+              >
+                Re-initialize
+              </button>
+            )}
           </div>
         )}
       </div>
-
-      {showConnect && (
-        <GithubConnectModal
-          onSignIn={auth.signIn}
-          onClose={() => setShowConnect(false)}
-        />
-      )}
 
       {tab === "quiz" ? (
         <QuizEditor data={quiz.data} onChange={quiz.setData} />
       ) : (
         <TriviaEditor data={trivia.data} onChange={trivia.setData} />
       )}
-    </div>
-  );
-}
-
-function GithubAuthControls({
-  auth,
-  onConnect,
-}: {
-  auth: GithubAuth;
-  onConnect: () => void;
-}) {
-  if (!auth.authed) {
-    return (
-      <button
-        type="button"
-        onClick={onConnect}
-        className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
-      >
-        Connect GitHub
-      </button>
-    );
-  }
-  return (
-    <div className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs text-neutral-700">
-      <span>@{auth.login}</span>
-      <button
-        type="button"
-        onClick={auth.signOut}
-        className="text-neutral-400 hover:text-neutral-700"
-        title="Disconnect"
-      >
-        ×
-      </button>
     </div>
   );
 }
