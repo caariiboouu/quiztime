@@ -221,7 +221,31 @@
       "id": "ceramic-duck-steal-mpoc0mrf",
       "name": "Ceramic Duck Hunt",
       "description": "One special question to claim custodianship of the duck regardless of what team wins. Also grants a point.",
-      "questions": []
+      "questions": [
+        {
+          "id": "ceramic-duck-steal-mpoc0mrf-mpodaw4i",
+          "question": "Traditional ceramics are not considered agglomerate materials, but they heavily rely on what process to lock their individual particles together? ",
+          "answers": [
+            {
+              "id": "a",
+              "text": "sintering"
+            },
+            {
+              "id": "b",
+              "text": "fission"
+            },
+            {
+              "id": "c",
+              "text": "chemical binding"
+            },
+            {
+              "id": "d",
+              "text": "smelting"
+            }
+          ],
+          "correctAnswerId": "a"
+        }
+      ]
     }
   ]
 }
