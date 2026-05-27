@@ -8,6 +8,21 @@ import { QUIZ_OVERRIDE_KEY } from "../quiz/QuizGame";
 import { TRIVIA_OVERRIDE_KEY } from "../games/AFTrivia";
 import { QuizEditor } from "./QuizEditor";
 import { TriviaEditor } from "./TriviaEditor";
+import {
+  GithubConnectModal,
+  useGithubAuth,
+  type GithubAuth,
+} from "./GithubConnect";
+import { GithubError, getFile, putFile } from "../../lib/github";
+
+const QUIZ_PATH = "src/data/quiz.json";
+const TRIVIA_PATH = "src/data/afTrivia.json";
+
+type SaveStatus =
+  | { state: "idle" }
+  | { state: "saving" }
+  | { state: "success"; message: string }
+  | { state: "error"; message: string };
 
 const PASSWORD = "afafafaf";
 const SESSION_KEY = "quiztime.admin.unlocked";
@@ -100,6 +115,38 @@ function Inner({ onExit }: { onExit: () => void }) {
   const [tab, setTab] = useState<"quiz" | "trivia">("quiz");
   const quizImportRef = useRef<HTMLInputElement>(null);
   const triviaImportRef = useRef<HTMLInputElement>(null);
+  const auth = useGithubAuth();
+  const [showConnect, setShowConnect] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>({ state: "idle" });
+
+  const saveToRepo = async () => {
+    if (!auth.token) return;
+    const path = tab === "quiz" ? QUIZ_PATH : TRIVIA_PATH;
+    const payload = tab === "quiz" ? quiz.data : trivia.data;
+    const content = JSON.stringify(payload, null, 2) + "\n";
+    setSaveStatus({ state: "saving" });
+    try {
+      const existing = await getFile(auth.token, path);
+      const summary =
+        tab === "quiz"
+          ? `Update ??? quiz content (${(payload as QuizData).categories.length} categories)`
+          : `Update AF Trivia content (${(payload as TriviaData).questions.length} questions)`;
+      const message = `${summary} via admin panel`;
+      await putFile(auth.token, path, content, message, existing?.sha);
+      setSaveStatus({
+        state: "success",
+        message: "Committed — Pages will rebuild in about a minute.",
+      });
+    } catch (err) {
+      let msg = err instanceof Error ? err.message : "Commit failed";
+      if (err instanceof GithubError && err.status === 409) {
+        msg = "Someone else committed first. Refresh the page and re-apply your edits.";
+      } else if (err instanceof GithubError && err.status === 401) {
+        msg = "Token rejected. Disconnect and re-enter a valid token.";
+      }
+      setSaveStatus({ state: "error", message: msg });
+    }
+  };
 
   const handleImport = async (file: File, target: "quiz" | "trivia") => {
     try {
@@ -161,12 +208,21 @@ function Inner({ onExit }: { onExit: () => void }) {
             AF Trivia
           </button>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             {active.isOverridden && (
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
                 Unsaved override
               </span>
             )}
+            <GithubAuthControls auth={auth} onConnect={() => setShowConnect(true)} />
+            <button
+              type="button"
+              disabled={!auth.authed || saveStatus.state === "saving"}
+              onClick={() => void saveToRepo()}
+              className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saveStatus.state === "saving" ? "Saving…" : "Save to repo"}
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -222,16 +278,67 @@ function Inner({ onExit }: { onExit: () => void }) {
           </div>
         </div>
         <div className="mx-auto w-full max-w-4xl px-6 pb-3 text-xs text-neutral-500">
-          Edits live in your browser only. Export when you're done to commit the
-          file to the repo.
+          Edits live in your browser. <strong>Save to repo</strong> commits to
+          GitHub and the site rebuilds in about a minute; <strong>Export</strong>
+          downloads the file if you'd rather commit manually.
         </div>
+        {saveStatus.state === "success" && (
+          <div className="border-t border-green-200 bg-green-50 px-6 py-2 text-sm text-green-900">
+            {saveStatus.message}
+          </div>
+        )}
+        {saveStatus.state === "error" && (
+          <div className="border-t border-red-200 bg-red-50 px-6 py-2 text-sm text-red-900">
+            {saveStatus.message}
+          </div>
+        )}
       </div>
+
+      {showConnect && (
+        <GithubConnectModal
+          onSignIn={auth.signIn}
+          onClose={() => setShowConnect(false)}
+        />
+      )}
 
       {tab === "quiz" ? (
         <QuizEditor data={quiz.data} onChange={quiz.setData} />
       ) : (
         <TriviaEditor data={trivia.data} onChange={trivia.setData} />
       )}
+    </div>
+  );
+}
+
+function GithubAuthControls({
+  auth,
+  onConnect,
+}: {
+  auth: GithubAuth;
+  onConnect: () => void;
+}) {
+  if (!auth.authed) {
+    return (
+      <button
+        type="button"
+        onClick={onConnect}
+        className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+      >
+        Connect GitHub
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs text-neutral-700">
+      <span>@{auth.login}</span>
+      <button
+        type="button"
+        onClick={auth.signOut}
+        className="text-neutral-400 hover:text-neutral-700"
+        title="Disconnect"
+      >
+        ×
+      </button>
     </div>
   );
 }
