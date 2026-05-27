@@ -1,8 +1,11 @@
 import { useEffect, useMemo } from "react";
-import triviaData from "../../data/afTrivia.json";
+import bundledTrivia from "../../data/afTrivia.json";
 import type { Question, TriviaData } from "../../types";
 import { useAnsweredQuestions } from "../../hooks/useAnsweredQuestions";
+import { useOverridableJson } from "../../hooks/useOverridableJson";
 import { usePersistentState } from "../../hooks/usePersistentState";
+
+export const TRIVIA_OVERRIDE_KEY = "quiztime.af-trivia.content";
 import { NavBar } from "../NavBar";
 import { QuestionPlay } from "../quiz/QuestionPlay";
 import { AnsweredList } from "../quiz/AnsweredList";
@@ -20,7 +23,10 @@ const PSEUDO_CATEGORY_ID = "af-trivia";
 const VIEW_KEY = "quiztime.af-trivia.view";
 
 export function AFTrivia({ onExit }: AFTriviaProps) {
-  const data = triviaData as TriviaData;
+  const { data } = useOverridableJson<TriviaData>(
+    TRIVIA_OVERRIDE_KEY,
+    bundledTrivia as TriviaData,
+  );
   const { answered, markAnswered, unanswer, clearAll } = useAnsweredQuestions(
     "quiztime.answered.af-trivia",
   );

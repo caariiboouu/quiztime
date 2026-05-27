@@ -1,9 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Hub } from "./components/Hub";
 import { QuizGame } from "./components/quiz/QuizGame";
 import { AFTrivia } from "./components/games/AFTrivia";
 import { CookieFace } from "./components/games/CookieFace";
 import { CarrotInABox } from "./components/games/CarrotInABox";
+import { AdminPanel } from "./components/admin/AdminPanel";
 import { GAMES } from "./data/games";
 import type { GameId } from "./types";
 import { usePersistentState } from "./hooks/usePersistentState";
@@ -15,12 +16,14 @@ function App() {
     "quiztime.activeGame",
     null,
   );
+  const [adminOpen, setAdminOpen] = useState(false);
   const goHome = () => setActiveGame(null);
 
-  // Drop a stale active game if its id no longer exists in the registry.
   useEffect(() => {
     if (activeGame && !VALID_IDS.has(activeGame)) setActiveGame(null);
   }, [activeGame, setActiveGame]);
+
+  if (adminOpen) return <AdminPanel onExit={() => setAdminOpen(false)} />;
 
   switch (activeGame) {
     case "cookie-face":
@@ -32,7 +35,12 @@ function App() {
     case "mystery-quiz":
       return <QuizGame onExit={goHome} />;
     default:
-      return <Hub onSelectGame={setActiveGame} />;
+      return (
+        <Hub
+          onSelectGame={setActiveGame}
+          onOpenAdmin={() => setAdminOpen(true)}
+        />
+      );
   }
 }
 

@@ -4,9 +4,10 @@ import { NavBar } from "./NavBar";
 
 type HubProps = {
   onSelectGame: (id: GameId) => void;
+  onOpenAdmin: () => void;
 };
 
-export function Hub({ onSelectGame }: HubProps) {
+export function Hub({ onSelectGame, onOpenAdmin }: HubProps) {
   return (
     <div className="flex h-full flex-col">
       <NavBar title="Survivor: Benefits Battleground" />
@@ -42,6 +43,15 @@ export function Hub({ onSelectGame }: HubProps) {
           ))}
         </div>
       </main>
+      <footer className="px-6 py-4 text-right">
+        <button
+          type="button"
+          onClick={onOpenAdmin}
+          className="text-xs font-medium text-neutral-400 hover:text-neutral-700"
+        >
+          Edit content
+        </button>
+      </footer>
     </div>
   );
 }

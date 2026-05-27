@@ -1,8 +1,11 @@
 import { useEffect, useMemo } from "react";
-import quizData from "../../data/quiz.json";
+import bundledQuiz from "../../data/quiz.json";
 import type { Category, QuizData, Question } from "../../types";
 import { useAnsweredQuestions } from "../../hooks/useAnsweredQuestions";
+import { useOverridableJson } from "../../hooks/useOverridableJson";
 import { usePersistentState } from "../../hooks/usePersistentState";
+
+export const QUIZ_OVERRIDE_KEY = "quiztime.quiz.content";
 import { NavBar } from "../NavBar";
 import { CategorySelect } from "./CategorySelect";
 import { AnsweredList } from "./AnsweredList";
@@ -20,7 +23,10 @@ type QuizGameProps = {
 const VIEW_KEY = "quiztime.quiz.view";
 
 export function QuizGame({ onExit }: QuizGameProps) {
-  const data = quizData as QuizData;
+  const { data } = useOverridableJson<QuizData>(
+    QUIZ_OVERRIDE_KEY,
+    bundledQuiz as QuizData,
+  );
   const { answered, markAnswered, unanswer, clearAll } = useAnsweredQuestions(
     "quiztime.answered.quiz",
   );
