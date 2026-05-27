@@ -7,12 +7,24 @@
       "questions": [
         {
           "id": "company-1",
-          "question": "What year was our department originally formed?",
+          "question": "What year was our department originally formed???",
           "answers": [
-            { "id": "a", "text": "2008" },
-            { "id": "b", "text": "2012" },
-            { "id": "c", "text": "2015" },
-            { "id": "d", "text": "2019" }
+            {
+              "id": "a",
+              "text": "2008"
+            },
+            {
+              "id": "b",
+              "text": "2012"
+            },
+            {
+              "id": "c",
+              "text": "2015"
+            },
+            {
+              "id": "d",
+              "text": "2019"
+            }
           ],
           "correctAnswerId": "b",
           "factoid": "The department was originally formed as a small pilot team and grew to its current size over the next decade."
@@ -21,10 +33,22 @@
           "id": "company-2",
           "question": "Which of these is NOT one of our department's core values?",
           "answers": [
-            { "id": "a", "text": "Curiosity" },
-            { "id": "b", "text": "Accountability" },
-            { "id": "c", "text": "Synergy" },
-            { "id": "d", "text": "Craftsmanship" }
+            {
+              "id": "a",
+              "text": "Curiosity"
+            },
+            {
+              "id": "b",
+              "text": "Accountability"
+            },
+            {
+              "id": "c",
+              "text": "Synergy"
+            },
+            {
+              "id": "d",
+              "text": "Craftsmanship"
+            }
           ],
           "correctAnswerId": "c",
           "factoid": "We deliberately avoided buzzwords like 'synergy' when defining the values — the goal was to pick words that meant something specific."
@@ -65,10 +89,22 @@
           "question": "Which logo is shown here?",
           "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Spotify_logo_without_text.svg/240px-Spotify_logo_without_text.svg.png",
           "answers": [
-            { "id": "a", "text": "Apple Music" },
-            { "id": "b", "text": "Spotify" },
-            { "id": "c", "text": "Pandora" },
-            { "id": "d", "text": "Tidal" }
+            {
+              "id": "a",
+              "text": "Apple Music"
+            },
+            {
+              "id": "b",
+              "text": "Spotify"
+            },
+            {
+              "id": "c",
+              "text": "Pandora"
+            },
+            {
+              "id": "d",
+              "text": "Tidal"
+            }
           ],
           "correctAnswerId": "b",
           "factoid": "Spotify launched in Sweden in 2008 and now has over 600 million users worldwide."
@@ -84,10 +120,22 @@
           "id": "geo-1",
           "question": "What is the capital of Australia?",
           "answers": [
-            { "id": "a", "text": "Sydney" },
-            { "id": "b", "text": "Melbourne" },
-            { "id": "c", "text": "Canberra" },
-            { "id": "d", "text": "Perth" }
+            {
+              "id": "a",
+              "text": "Sydney"
+            },
+            {
+              "id": "b",
+              "text": "Melbourne"
+            },
+            {
+              "id": "c",
+              "text": "Canberra"
+            },
+            {
+              "id": "d",
+              "text": "Perth"
+            }
           ],
           "correctAnswerId": "c",
           "factoid": "Canberra was chosen as a compromise capital in 1908 because Sydney and Melbourne couldn't agree on which of them should be the capital."
@@ -97,10 +145,22 @@
           "question": "Which country's flag is this?",
           "image": "https://upload.wikimedia.org/wikipedia/en/thumb/0/03/Flag_of_Italy.svg/320px-Flag_of_Italy.svg.png",
           "answers": [
-            { "id": "a", "text": "Mexico" },
-            { "id": "b", "text": "Ireland" },
-            { "id": "c", "text": "Italy" },
-            { "id": "d", "text": "Hungary" }
+            {
+              "id": "a",
+              "text": "Mexico"
+            },
+            {
+              "id": "b",
+              "text": "Ireland"
+            },
+            {
+              "id": "c",
+              "text": "Italy"
+            },
+            {
+              "id": "d",
+              "text": "Hungary"
+            }
           ],
           "correctAnswerId": "c",
           "factoid": "Italy's flag (the 'Tricolore') was inspired by the French flag and dates back to 1797."
@@ -116,10 +176,22 @@
           "id": "joel-1",
           "question": "In the comic stip Calvin and Hobbes, what was the occupation of Calvin's father?",
           "answers": [
-            { "id": "a", "text": "An Accountant" },
-            { "id": "b", "text": "A Phlebotomist" },
-            { "id": "c", "text": "A Binocular Company CEO" },
-            { "id": "d", "text": "A Patent Lawyer" }
+            {
+              "id": "a",
+              "text": "An Accountant"
+            },
+            {
+              "id": "b",
+              "text": "A Phlebotomist"
+            },
+            {
+              "id": "c",
+              "text": "A Binocular Company CEO"
+            },
+            {
+              "id": "d",
+              "text": "A Patent Lawyer"
+            }
           ],
           "correctAnswerId": "d",
           "factoid": "This is revealed in only one strip where his father reads him the patent information at his desk as a sardonic 'story' over the phone."
@@ -128,10 +200,22 @@
           "id": "joel-2",
           "question": "What is the east-west highway that leads to (now closed) Crossroads Theater?",
           "answers": [
-            { "id": "a", "text": "I-240" },
-            { "id": "b", "text": "I-40" },
-            { "id": "c", "text": "I-44" },
-            { "id": "d", "text": "I-344" }
+            {
+              "id": "a",
+              "text": "I-240"
+            },
+            {
+              "id": "b",
+              "text": "I-40"
+            },
+            {
+              "id": "c",
+              "text": "I-44"
+            },
+            {
+              "id": "d",
+              "text": "I-344"
+            }
           ],
           "correctAnswerId": "a",
           "factoid": "When I was 16 I tried to meet my friend at Crossroads to see Spider Man, I got on the wrong highway and ended up in Yukon"
@@ -140,10 +224,22 @@
           "id": "joel-3",
           "question": "What is the east-west highway that leads to (now closed) Crossroads Theater?",
           "answers": [
-            { "id": "a", "text": "I-240" },
-            { "id": "b", "text": "I-40" },
-            { "id": "c", "text": "I-44" },
-            { "id": "d", "text": "I-344" }
+            {
+              "id": "a",
+              "text": "I-240"
+            },
+            {
+              "id": "b",
+              "text": "I-40"
+            },
+            {
+              "id": "c",
+              "text": "I-44"
+            },
+            {
+              "id": "d",
+              "text": "I-344"
+            }
           ],
           "correctAnswerId": "a",
           "factoid": "When I was 16 I tried to meet my friend at Crossroads to see Spider Man, I got on the wrong highway and ended up in Yukon"
