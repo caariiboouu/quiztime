@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import quizData from "../../data/quiz.json";
 import type { Category, QuizData, Question } from "../../types";
 import { useAnsweredQuestions } from "../../hooks/useAnsweredQuestions";
+import { usePersistentState } from "../../hooks/usePersistentState";
 import { NavBar } from "../NavBar";
 import { CategorySelect } from "./CategorySelect";
 import { AnsweredList } from "./AnsweredList";
@@ -10,20 +11,41 @@ import { QuestionPlay } from "./QuestionPlay";
 type View =
   | { kind: "categories" }
   | { kind: "answered" }
-  | { kind: "play"; category: Category; question: Question };
+  | { kind: "play"; categoryId: string; questionId: string };
 
 type QuizGameProps = {
   onExit: () => void;
 };
+
+const VIEW_KEY = "quiztime.quiz.view";
 
 export function QuizGame({ onExit }: QuizGameProps) {
   const data = quizData as QuizData;
   const { answered, markAnswered, unanswer, clearAll } = useAnsweredQuestions(
     "quiztime.answered.quiz",
   );
-  const [view, setView] = useState<View>({ kind: "categories" });
+  const [view, setView] = usePersistentState<View>(VIEW_KEY, {
+    kind: "categories",
+  });
 
   const categories = useMemo(() => data.categories, [data]);
+
+  // Resolve persisted ids back to live objects, gracefully falling back to
+  // the category screen if the question/category was removed from JSON.
+  const playState: { category: Category; question: Question } | null = useMemo(() => {
+    if (view.kind !== "play") return null;
+    const cat = categories.find((c) => c.id === view.categoryId);
+    if (!cat) return null;
+    const q = cat.questions.find((q) => q.id === view.questionId);
+    if (!q) return null;
+    return { category: cat, question: q };
+  }, [view, categories]);
+
+  useEffect(() => {
+    if (view.kind === "play" && !playState) {
+      setView({ kind: "categories" });
+    }
+  }, [view, playState, setView]);
 
   const pickRandomQuestion = (cat: Category): Question | null => {
     const remaining = cat.questions.filter((q) => !answered[q.id]);
@@ -33,26 +55,20 @@ export function QuizGame({ onExit }: QuizGameProps) {
 
   const handlePickCategory = (cat: Category) => {
     const q = pickRandomQuestion(cat);
-    if (q) setView({ kind: "play", category: cat, question: q });
+    if (q) setView({ kind: "play", categoryId: cat.id, questionId: q.id });
   };
 
   const handleQuestionComplete = (correct: boolean) => {
-    if (view.kind !== "play") return;
-    markAnswered(view.question.id, view.category.id, correct);
+    if (!playState) return;
+    markAnswered(playState.question.id, playState.category.id, correct);
     setView({ kind: "categories" });
   };
 
   const headerTitle =
-    view.kind === "play"
-      ? "???"
-      : view.kind === "answered"
-        ? "Answered"
-        : "???";
+    view.kind === "play" ? "???" : view.kind === "answered" ? "Answered" : "???";
 
   const navBack =
-    view.kind === "categories"
-      ? onExit
-      : () => setView({ kind: "categories" });
+    view.kind === "categories" ? onExit : () => setView({ kind: "categories" });
 
   return (
     <div className="flex h-full flex-col">
@@ -73,10 +89,12 @@ export function QuizGame({ onExit }: QuizGameProps) {
           onClearAll={clearAll}
         />
       )}
-      {view.kind === "play" && (
+      {playState && (
         <QuestionPlay
-          question={view.question}
-          categoryName={view.category.name}
+          key={playState.question.id}
+          question={playState.question}
+          categoryName={playState.category.name}
+          stateKey={`quiztime.quiz.play.${playState.question.id}`}
           onComplete={handleQuestionComplete}
           onCancel={() => setView({ kind: "categories" })}
         />

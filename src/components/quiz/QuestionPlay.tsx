@@ -1,12 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import confetti from "canvas-confetti";
 import type { Question } from "../../types";
+import {
+  clearPersistentState,
+  usePersistentState,
+} from "../../hooks/usePersistentState";
 
 type Phase = "revealing" | "selecting" | "result" | "factoid";
 
 type QuestionPlayProps = {
   question: Question;
   categoryName: string;
+  stateKey: string;
   onComplete: (correct: boolean) => void;
   onCancel: () => void;
 };
@@ -14,12 +19,30 @@ type QuestionPlayProps = {
 export function QuestionPlay({
   question,
   categoryName,
+  stateKey,
   onComplete,
   onCancel,
 }: QuestionPlayProps) {
-  const [phase, setPhase] = useState<Phase>("revealing");
-  const [revealedCount, setRevealedCount] = useState(0);
-  const [selectedAnswerId, setSelectedAnswerId] = useState<string | null>(null);
+  const [phase, setPhase] = usePersistentState<Phase>(
+    `${stateKey}.phase`,
+    "revealing",
+  );
+  const [revealedCount, setRevealedCount] = usePersistentState<number>(
+    `${stateKey}.revealedCount`,
+    0,
+  );
+  const [selectedAnswerId, setSelectedAnswerId] = usePersistentState<
+    string | null
+  >(`${stateKey}.selectedAnswerId`, null);
+
+  // After a refresh, restoring phase="result" should not re-fire confetti.
+  const confettiFiredRef = useRef(phase === "result" || phase === "factoid");
+
+  const clearPersisted = useCallback(() => {
+    clearPersistentState(`${stateKey}.phase`);
+    clearPersistentState(`${stateKey}.revealedCount`);
+    clearPersistentState(`${stateKey}.selectedAnswerId`);
+  }, [stateKey]);
 
   const totalAnswers = question.answers.length;
   const allRevealed = revealedCount >= totalAnswers;
@@ -42,23 +65,26 @@ export function QuestionPlay({
     if (phase !== "selecting" || !selectedAnswerId) return;
     const correct = selectedAnswerId === question.correctAnswerId;
     setPhase("result");
-    if (correct) {
+    if (correct && !confettiFiredRef.current) {
+      confettiFiredRef.current = true;
       fireConfetti();
     }
-  }, [phase, selectedAnswerId, question.correctAnswerId]);
+  }, [phase, selectedAnswerId, question.correctAnswerId, setPhase]);
 
   const handleContinueToFactoid = useCallback(() => {
     if (phase !== "result") return;
     if (question.factoid || question.factoidImage) {
       setPhase("factoid");
     } else {
+      clearPersisted();
       onComplete(selectedAnswerId === question.correctAnswerId);
     }
-  }, [phase, question, selectedAnswerId, onComplete]);
+  }, [phase, question, selectedAnswerId, onComplete, setPhase, clearPersisted]);
 
   const handleFinish = useCallback(() => {
+    clearPersisted();
     onComplete(selectedAnswerId === question.correctAnswerId);
-  }, [onComplete, selectedAnswerId, question.correctAnswerId]);
+  }, [onComplete, selectedAnswerId, question.correctAnswerId, clearPersisted]);
 
   // Spacebar handler
   useEffect(() => {

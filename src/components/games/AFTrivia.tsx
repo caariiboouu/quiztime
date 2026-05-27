@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import triviaData from "../../data/afTrivia.json";
 import type { Question, TriviaData } from "../../types";
 import { useAnsweredQuestions } from "../../hooks/useAnsweredQuestions";
+import { usePersistentState } from "../../hooks/usePersistentState";
 import { NavBar } from "../NavBar";
 import { QuestionPlay } from "../quiz/QuestionPlay";
 import { AnsweredList } from "../quiz/AnsweredList";
@@ -9,28 +10,27 @@ import { AnsweredList } from "../quiz/AnsweredList";
 type View =
   | { kind: "ready" }
   | { kind: "answered" }
-  | { kind: "play"; question: Question };
+  | { kind: "play"; questionId: string };
 
 type AFTriviaProps = {
   onExit: () => void;
 };
 
 const PSEUDO_CATEGORY_ID = "af-trivia";
+const VIEW_KEY = "quiztime.af-trivia.view";
 
 export function AFTrivia({ onExit }: AFTriviaProps) {
   const data = triviaData as TriviaData;
   const { answered, markAnswered, unanswer, clearAll } = useAnsweredQuestions(
     "quiztime.answered.af-trivia",
   );
-  const [view, setView] = useState<View>({ kind: "ready" });
+  const [view, setView] = usePersistentState<View>(VIEW_KEY, { kind: "ready" });
 
   const remaining = useMemo(
     () => data.questions.filter((q) => !answered[q.id]),
     [data, answered],
   );
 
-  // Wrap the flat question list in a single fake category so the answered list
-  // and unanswer flow can reuse the same components.
   const wrappedCategories = useMemo(
     () => [
       {
@@ -42,15 +42,26 @@ export function AFTrivia({ onExit }: AFTriviaProps) {
     [data],
   );
 
+  const activeQuestion: Question | null = useMemo(() => {
+    if (view.kind !== "play") return null;
+    return data.questions.find((q) => q.id === view.questionId) ?? null;
+  }, [view, data]);
+
+  useEffect(() => {
+    if (view.kind === "play" && !activeQuestion) {
+      setView({ kind: "ready" });
+    }
+  }, [view, activeQuestion, setView]);
+
   const pickRandom = () => {
     if (remaining.length === 0) return;
     const q = remaining[Math.floor(Math.random() * remaining.length)];
-    setView({ kind: "play", question: q });
+    setView({ kind: "play", questionId: q.id });
   };
 
   const handleQuestionComplete = (correct: boolean) => {
-    if (view.kind !== "play") return;
-    markAnswered(view.question.id, PSEUDO_CATEGORY_ID, correct);
+    if (!activeQuestion) return;
+    markAnswered(activeQuestion.id, PSEUDO_CATEGORY_ID, correct);
     setView({ kind: "ready" });
   };
 
@@ -100,10 +111,12 @@ export function AFTrivia({ onExit }: AFTriviaProps) {
           onClearAll={clearAll}
         />
       )}
-      {view.kind === "play" && (
+      {activeQuestion && (
         <QuestionPlay
-          question={view.question}
+          key={activeQuestion.id}
+          question={activeQuestion}
           categoryName="AF Trivia"
+          stateKey={`quiztime.af-trivia.play.${activeQuestion.id}`}
           onComplete={handleQuestionComplete}
           onCancel={() => setView({ kind: "ready" })}
         />
