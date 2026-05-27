@@ -1,0 +1,130 @@
+{
+  "categories": [
+    {
+      "id": "company",
+      "name": "Around the Office",
+      "description": "How well do you know our department?",
+      "questions": [
+        {
+          "id": "company-1",
+          "question": "What year was our department originally formed?",
+          "answers": [
+            { "id": "a", "text": "2008" },
+            { "id": "b", "text": "2012" },
+            { "id": "c", "text": "2015" },
+            { "id": "d", "text": "2019" }
+          ],
+          "correctAnswerId": "b",
+          "factoid": "The department was originally formed as a small pilot team and grew to its current size over the next decade."
+        },
+        {
+          "id": "company-2",
+          "question": "Which of these is NOT one of our department's core values?",
+          "answers": [
+            { "id": "a", "text": "Curiosity" },
+            { "id": "b", "text": "Accountability" },
+            { "id": "c", "text": "Synergy" },
+            { "id": "d", "text": "Craftsmanship" }
+          ],
+          "correctAnswerId": "c",
+          "factoid": "We deliberately avoided buzzwords like 'synergy' when defining the values — the goal was to pick words that meant something specific."
+        }
+      ]
+    },
+    {
+      "id": "pop-culture",
+      "name": "Pop Culture",
+      "description": "Movies, TV, music, and the internet.",
+      "questions": [
+        {
+          "id": "pop-1",
+          "question": "Which movie won Best Picture at the 2024 Academy Awards?",
+          "answers": [
+            { "id": "a", "text": "Oppenheimer" },
+            { "id": "b", "text": "Barbie" },
+            { "id": "c", "text": "Killers of the Flower Moon" },
+            { "id": "d", "text": "Poor Things" }
+          ],
+          "correctAnswerId": "a",
+          "factoid": "Oppenheimer also took home awards for Best Director (Christopher Nolan), Best Actor (Cillian Murphy), and Best Supporting Actor (Robert Downey Jr.)."
+        },
+        {
+          "id": "pop-2",
+          "question": "Which logo is shown here?",
+          "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Spotify_logo_without_text.svg/240px-Spotify_logo_without_text.svg.png",
+          "answers": [
+            { "id": "a", "text": "Apple Music" },
+            { "id": "b", "text": "Spotify" },
+            { "id": "c", "text": "Pandora" },
+            { "id": "d", "text": "Tidal" }
+          ],
+          "correctAnswerId": "b",
+          "factoid": "Spotify launched in Sweden in 2008 and now has over 600 million users worldwide."
+        }
+      ]
+    },
+    {
+      "id": "geography",
+      "name": "Geography",
+      "description": "Places, flags, and capitals.",
+      "questions": [
+        {
+          "id": "geo-1",
+          "question": "What is the capital of Australia?",
+          "answers": [
+            { "id": "a", "text": "Sydney" },
+            { "id": "b", "text": "Melbourne" },
+            { "id": "c", "text": "Canberra" },
+            { "id": "d", "text": "Perth" }
+          ],
+          "correctAnswerId": "c",
+          "factoid": "Canberra was chosen as a compromise capital in 1908 because Sydney and Melbourne couldn't agree on which of them should be the capital."
+        },
+        {
+          "id": "geo-2",
+          "question": "Which country's flag is this?",
+          "image": "https://upload.wikimedia.org/wikipedia/en/thumb/0/03/Flag_of_Italy.svg/320px-Flag_of_Italy.svg.png",
+          "answers": [
+            { "id": "a", "text": "Mexico" },
+            { "id": "b", "text": "Ireland" },
+            { "id": "c", "text": "Italy" },
+            { "id": "d", "text": "Hungary" }
+          ],
+          "correctAnswerId": "c",
+          "factoid": "Italy's flag (the 'Tricolore') was inspired by the French flag and dates back to 1797."
+        }
+      ]
+    },
+    {
+      "id": "science",
+      "name": "Science & Nature",
+      "description": "From atoms to animals.",
+      "questions": [
+        {
+          "id": "sci-1",
+          "question": "How many bones are in the adult human body?",
+          "answers": [
+            { "id": "a", "text": "186" },
+            { "id": "b", "text": "206" },
+            { "id": "c", "text": "226" },
+            { "id": "d", "text": "246" }
+          ],
+          "correctAnswerId": "b",
+          "factoid": "Babies are actually born with about 270 bones — many of them fuse together as we grow."
+        },
+        {
+          "id": "sci-2",
+          "question": "Which planet has the most moons?",
+          "answers": [
+            { "id": "a", "text": "Jupiter" },
+            { "id": "b", "text": "Saturn" },
+            { "id": "c", "text": "Uranus" },
+            { "id": "d", "text": "Neptune" }
+          ],
+          "correctAnswerId": "b",
+          "factoid": "Saturn overtook Jupiter in 2023 when astronomers confirmed 62 new moons, bringing its total to 146."
+        }
+      ]
+    }
+  ]
+}
