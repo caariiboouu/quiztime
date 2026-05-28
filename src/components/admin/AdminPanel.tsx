@@ -358,6 +358,7 @@ function Inner({
           ? `Update ??? quiz content (${(payload as QuizData).categories.length} categories)`
           : `Update AF Trivia content (${(payload as TriviaData).questions.length} questions)`;
       await putFile(token, path, content, `${summary} via admin panel`, existing?.sha);
+      (tab === "quiz" ? quiz : trivia).markSaved();
       setSaveStatus({
         state: "success",
         message: "Committed — Pages will rebuild in about a minute.",
@@ -405,9 +406,9 @@ function Inner({
           </button>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            {active.isOverridden && (
+            {active.isDirty && (
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                Unsaved override
+                Unsaved changes
               </span>
             )}
             <button
