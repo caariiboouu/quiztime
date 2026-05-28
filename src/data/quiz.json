@@ -23,6 +23,29 @@
             }
           ],
           "correctAnswerId": "c"
+        },
+        {
+          "id": "company-mppip0b4",
+          "question": "Thomas Musgrave, Fellow of the Royal Geographical Society, was shipwrecked on the subantarctic Auckland island with his crew, how did they survive the cold?",
+          "answers": [
+            {
+              "id": "a",
+              "text": "Discovering a large cave on the island and building a windproof door out of seal skins."
+            },
+            {
+              "id": "b",
+              "text": "Burning the ship piece by piece to keep a fire going."
+            },
+            {
+              "id": "c",
+              "text": "By disassembling their ship and building a cabin out of it."
+            },
+            {
+              "id": "d",
+              "text": "By building a network of igloos that also worked as a seal trap."
+            }
+          ],
+          "correctAnswerId": "c"
         }
       ]
     },
