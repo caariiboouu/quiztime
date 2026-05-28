@@ -125,6 +125,10 @@
             {
               "id": "c",
               "text": "Create a rudimentary lathe from coconuts to drill out the infected tooth."
+            },
+            {
+              "id": "d",
+              "text": "Fashion crowns from carefully selected seashells and seal with coconut resin."
             }
           ],
           "correctAnswerId": "a",
