@@ -111,53 +111,24 @@
       "description": "No doctors? No dentists? No paperwork?",
       "questions": [
         {
-          "id": "geo-1",
-          "question": "What is the capital of Australia?",
+          "id": "geography-mppkwpus",
+          "question": "What's the best way to treat a bad tooth if you're deserted on an island without a dentist?",
           "answers": [
             {
               "id": "a",
-              "text": "Sydney"
+              "text": "Leave the tooth in, saltwater rinse, keep clean, only pull with a cloth if truly loose."
             },
             {
               "id": "b",
-              "text": "Melbourne"
+              "text": "Lay with the tooth submerged in water, ocean creatures will clean the infected area."
             },
             {
               "id": "c",
-              "text": "Canberra"
-            },
-            {
-              "id": "d",
-              "text": "Perth"
+              "text": "Create a rudimentary lathe from coconuts to drill out the infected tooth."
             }
           ],
-          "correctAnswerId": "c",
-          "factoid": "Canberra was chosen as a compromise capital in 1908 because Sydney and Melbourne couldn't agree on which of them should be the capital."
-        },
-        {
-          "id": "geo-2",
-          "question": "Which country's flag is this?",
-          "image": "https://upload.wikimedia.org/wikipedia/en/thumb/0/03/Flag_of_Italy.svg/320px-Flag_of_Italy.svg.png",
-          "answers": [
-            {
-              "id": "a",
-              "text": "Mexico"
-            },
-            {
-              "id": "b",
-              "text": "Ireland"
-            },
-            {
-              "id": "c",
-              "text": "Italy"
-            },
-            {
-              "id": "d",
-              "text": "Hungary"
-            }
-          ],
-          "correctAnswerId": "c",
-          "factoid": "Italy's flag (the 'Tricolore') was inspired by the French flag and dates back to 1797."
+          "correctAnswerId": "a",
+          "factoid": "Most forms of pulling or breaking teeth are able to lead to deep, life-threatening infections. Consider booking ocean flights going to dental conferences."
         }
       ]
     },
