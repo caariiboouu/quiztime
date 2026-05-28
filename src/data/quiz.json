@@ -189,54 +189,6 @@
           ],
           "correctAnswerId": "d",
           "factoid": "This is revealed in only one strip where his father reads him the patent information at his desk as a sardonic 'story' over the phone."
-        },
-        {
-          "id": "joel-2",
-          "question": "What is the east-west highway that leads to (now closed) Crossroads Theater?",
-          "answers": [
-            {
-              "id": "a",
-              "text": "I-240"
-            },
-            {
-              "id": "b",
-              "text": "I-40"
-            },
-            {
-              "id": "c",
-              "text": "I-44"
-            },
-            {
-              "id": "d",
-              "text": "I-344"
-            }
-          ],
-          "correctAnswerId": "a",
-          "factoid": "When I was 16 I tried to meet my friend at Crossroads to see Spider Man, I got on the wrong highway and ended up in Yukon"
-        },
-        {
-          "id": "joel-3",
-          "question": "What is the east-west highway that leads to (now closed) Crossroads Theater?",
-          "answers": [
-            {
-              "id": "a",
-              "text": "I-240"
-            },
-            {
-              "id": "b",
-              "text": "I-40"
-            },
-            {
-              "id": "c",
-              "text": "I-44"
-            },
-            {
-              "id": "d",
-              "text": "I-344"
-            }
-          ],
-          "correctAnswerId": "a",
-          "factoid": "When I was 16 I tried to meet my friend at Crossroads to see Spider Man, I got on the wrong highway and ended up in Yukon"
         }
       ]
     },
