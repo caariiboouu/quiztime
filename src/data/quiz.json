@@ -170,7 +170,7 @@
     {
       "id": "ceramic-duck-steal-mpoc0mrf",
       "name": "Ceramic Duck Hunt",
-      "description": "One special question to claim custodianship of the duck regardless of what team wins. Also grants a point.",
+      "description": "One special question to claim custodianship of the duck regardless of what team wins. The person that correctly guesses gets the duck. Also grants their team points.",
       "questions": [
         {
           "id": "ceramic-duck-steal-mpoc0mrf-mpodaw4i",
