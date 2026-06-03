@@ -6,6 +6,10 @@ import { NavBar } from "./NavBar";
 
 export const DUCK_OVERRIDE_KEY = "quiztime.duckHours.override";
 
+/** Where self-serve name-change requests are emailed for manual approval. */
+const REQUEST_EMAIL = "joel@cuthriell.com";
+const RENAME_GUARD_MS = 24 * 60 * 60 * 1000;
+
 /** Rate at which a given rank earns duck-time. 1st = 1×, 2nd = ½×, 3rd = ⅓×… */
 export function rankFraction(rank: number | null): number {
   return rank && rank >= 1 ? 1 / rank : 0;
@@ -107,6 +111,49 @@ export function DuckHours({ onExit }: DuckHoursProps) {
     (a, b) => liveSeconds(data, b.id, now) - liveSeconds(data, a.id, now),
   );
 
+  // Self-serve name change: email the keeper a request (no server / token).
+  const [showForm, setShowForm] = useState(false);
+  const [selId, setSelId] = useState("");
+  const [newName, setNewName] = useState("");
+
+  const selHolder = data.holders.find((h) => h.id === selId);
+  const trimmedName = newName.replace(/\s+/g, " ").trim();
+  const recentlyRequested = (() => {
+    if (!selId) return false;
+    try {
+      const ts = Number(localStorage.getItem(`quiztime.duckRename.${selId}`));
+      return ts > 0 && now - ts < RENAME_GUARD_MS;
+    } catch {
+      return false;
+    }
+  })();
+  const canSend =
+    !!selId &&
+    trimmedName.length > 0 &&
+    trimmedName !== selHolder?.initials &&
+    !recentlyRequested;
+
+  const sendRequest = () => {
+    if (!canSend) return;
+    const subject = "Ceramic Duck — name change request";
+    const body = [
+      "Please update my Ceramic Duck leaderboard entry.",
+      "",
+      `Current name: ${selHolder?.initials || "(blank)"}`,
+      `Requested new name: ${trimmedName}`,
+      `Entry ID: ${selId}`,
+      `Requested at: ${new Date(now).toISOString()}`,
+    ].join("\n");
+    try {
+      localStorage.setItem(`quiztime.duckRename.${selId}`, String(now));
+    } catch {
+      // ignore
+    }
+    window.location.href = `mailto:${REQUEST_EMAIL}?subject=${encodeURIComponent(
+      subject,
+    )}&body=${encodeURIComponent(body)}`;
+  };
+
   return (
     <div className="flex h-full flex-col">
       <NavBar title="Ceramic Duck Hours" onBack={onExit} />
@@ -119,10 +166,74 @@ export function DuckHours({ onExit }: DuckHoursProps) {
           holder (1st) earns the full rate; runners-up earn a fraction — 2nd
           earns ½×, 3rd ⅓×, and so on.
         </p>
-        <p className="mb-8 text-sm text-neutral-500">
+        <p className="mb-6 text-sm text-neutral-500">
           Ranked by total time, so a steady runner-up can out-earn an occasional
           winner.
         </p>
+
+        {data.holders.length > 0 && (
+          <div className="mb-8 rounded-xl border border-neutral-200 bg-white p-4">
+            <p className="text-sm text-neutral-600">
+              Name spelled wrong?{" "}
+              <button
+                type="button"
+                onClick={() => setShowForm((v) => !v)}
+                className="font-medium text-amber-700 underline hover:text-amber-800"
+              >
+                Request a name change
+              </button>{" "}
+              — it opens an email to the keeper, who applies it by hand (one
+              request per entry per day).
+            </p>
+            {showForm && (
+              <>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <label className="flex-1 text-sm">
+                    <span className="mb-1 block text-neutral-700">
+                      Your entry
+                    </span>
+                    <select
+                      value={selId}
+                      onChange={(e) => setSelId(e.target.value)}
+                      className="w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                    >
+                      <option value="">Select…</option>
+                      {data.holders.map((h) => (
+                        <option key={h.id} value={h.id}>
+                          {h.initials || "—"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex-1 text-sm">
+                    <span className="mb-1 block text-neutral-700">New name</span>
+                    <input
+                      type="text"
+                      maxLength={32}
+                      value={newName}
+                      placeholder="What it should say"
+                      onChange={(e) => setNewName(e.target.value)}
+                      className="w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!canSend}
+                    onClick={sendRequest}
+                    className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Send request
+                  </button>
+                </div>
+                {recentlyRequested && (
+                  <p className="mt-2 text-sm text-amber-700">
+                    You already requested a change for this entry today.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         {ranked.length === 0 ? (
           <div className="rounded-xl border border-dashed border-neutral-300 bg-white p-10 text-center text-neutral-500">
@@ -169,11 +280,11 @@ export function DuckHours({ onExit }: DuckHoursProps) {
                     </span>
                   )}
                   <span
-                    className={`w-28 text-right text-xl font-semibold tabular-nums ${
+                    className={`w-36 text-right text-xl font-semibold tabular-nums ${
                       isHolding ? "text-amber-900" : "text-neutral-700"
                     }`}
                   >
-                    {formatDuration(total, isHolding && anyRunning)}
+                    {formatDuration(total, isRanked && anyRunning)}
                   </span>
                 </li>
               );
