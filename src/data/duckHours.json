@@ -1,5 +1,11 @@
 {
-  "holders": [],
-  "currentHolderId": null,
-  "heldSince": null
+  "holders": [
+    {
+      "id": "duck-mpydfdya-py15",
+      "initials": "RC",
+      "accumulatedSeconds": 2505600
+    }
+  ],
+  "currentHolderId": "duck-mpydfdya-py15",
+  "heldSince": "2026-06-03T18:00:54.037Z"
 }
