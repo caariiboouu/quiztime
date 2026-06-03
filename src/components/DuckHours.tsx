@@ -185,9 +185,7 @@ export function DuckHours({ onExit }: DuckHoursProps) {
                 className="font-medium text-amber-700 underline hover:text-amber-800"
               >
                 Request a name change
-              </button>{" "}
-              — it opens an email to the keeper, who applies it by hand (one
-              request per entry per day).
+              </button>
             </p>
             {showForm && (
               <>
