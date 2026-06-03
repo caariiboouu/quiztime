@@ -29,8 +29,7 @@ export type GameId =
   | "cookie-face"
   | "carrot-in-a-box"
   | "af-trivia"
-  | "mystery-quiz"
-  | "duck-hours";
+  | "mystery-quiz";
 
 export type DuckHolder = {
   id: string;

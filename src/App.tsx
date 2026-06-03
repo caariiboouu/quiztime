@@ -12,6 +12,19 @@ import { usePersistentState } from "./hooks/usePersistentState";
 
 const VALID_IDS = new Set<string>(GAMES.map((g) => g.id));
 
+// Ceramic Duck Hours lives at its own hash URL (#/duck) rather than on the Hub.
+const DUCK_HASHES = new Set(["#/duck", "#/duck-hours"]);
+
+function useHashRoute(): string {
+  const [hash, setHash] = useState(() => window.location.hash);
+  useEffect(() => {
+    const onChange = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", onChange);
+    return () => window.removeEventListener("hashchange", onChange);
+  }, []);
+  return hash;
+}
+
 function App() {
   const [activeGame, setActiveGame] = usePersistentState<GameId | null>(
     "quiztime.activeGame",
@@ -19,10 +32,21 @@ function App() {
   );
   const [adminOpen, setAdminOpen] = useState(false);
   const goHome = () => setActiveGame(null);
+  const hash = useHashRoute();
 
   useEffect(() => {
     if (activeGame && !VALID_IDS.has(activeGame)) setActiveGame(null);
   }, [activeGame, setActiveGame]);
+
+  if (DUCK_HASHES.has(hash)) {
+    return (
+      <DuckHours
+        onExit={() => {
+          window.location.hash = "";
+        }}
+      />
+    );
+  }
 
   if (adminOpen) return <AdminPanel onExit={() => setAdminOpen(false)} />;
 
@@ -35,8 +59,6 @@ function App() {
       return <AFTrivia onExit={goHome} />;
     case "mystery-quiz":
       return <QuizGame onExit={goHome} />;
-    case "duck-hours":
-      return <DuckHours onExit={goHome} />;
     default:
       return (
         <Hub
