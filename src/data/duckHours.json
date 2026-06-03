@@ -1,4 +1,155 @@
 {
-  "holders": [],
-  "heldSince": null
+  "holders": [
+    {
+      "id": "duck-mpydfdya-py15",
+      "initials": "RC Cola",
+      "accumulatedSeconds": 2506795.345,
+      "rank": 1
+    },
+    {
+      "id": "duck-mpye0xgz-5u5d",
+      "initials": "TT",
+      "accumulatedSeconds": 133.61,
+      "rank": 2
+    },
+    {
+      "id": "duck-mpye13qr-cmn0",
+      "initials": "4X4",
+      "accumulatedSeconds": 87.04966666666665,
+      "rank": 3
+    },
+    {
+      "id": "duck-mpye1acc-0h1o",
+      "initials": "2Js",
+      "accumulatedSeconds": 63.73557797619048,
+      "rank": 4
+    },
+    {
+      "id": "duck-mpye1kgg-t8fe",
+      "initials": "Ldot",
+      "accumulatedSeconds": 47.8964,
+      "rank": 5
+    },
+    {
+      "id": "duck-mpye1q4d-f04q",
+      "initials": "Meg",
+      "accumulatedSeconds": 38.70150000000001,
+      "rank": 6
+    },
+    {
+      "id": "duck-mpye1v0d-depg",
+      "initials": "HAWK",
+      "accumulatedSeconds": 32.14085714285713,
+      "rank": 7
+    },
+    {
+      "id": "duck-mpye21go-h1sk",
+      "initials": "Marcie",
+      "accumulatedSeconds": 27.113749999999992,
+      "rank": 8
+    },
+    {
+      "id": "duck-mpye273l-7l0l",
+      "initials": "A-Wall",
+      "accumulatedSeconds": 23.39155555555556,
+      "rank": 9
+    },
+    {
+      "id": "duck-mpye2qfh-g3cb",
+      "initials": "Lady d",
+      "accumulatedSeconds": 18.138899999999996,
+      "rank": 10
+    },
+    {
+      "id": "duck-mpye31bm-7akj",
+      "initials": "Lane, Son of Nel",
+      "accumulatedSeconds": 15.818363636363637,
+      "rank": 11
+    },
+    {
+      "id": "duck-mpye3cua-52n1",
+      "initials": "Pabs",
+      "accumulatedSeconds": 13.198083333333336,
+      "rank": 12
+    },
+    {
+      "id": "duck-mpye3khv-3tsj",
+      "initials": "barnes",
+      "accumulatedSeconds": 11.169384615384615,
+      "rank": 13
+    },
+    {
+      "id": "duck-mpye3rsj-ylks",
+      "initials": "Khai",
+      "accumulatedSeconds": 10.04592857142857,
+      "rank": 14
+    },
+    {
+      "id": "duck-mpye4005-czgc",
+      "initials": "Katelyn",
+      "accumulatedSeconds": 8.707599999999996,
+      "rank": 15
+    },
+    {
+      "id": "duck-mpye474r-r1o7",
+      "initials": "Liv",
+      "accumulatedSeconds": 7.836062499999998,
+      "rank": 16
+    },
+    {
+      "id": "duck-mpye4erm-xg82",
+      "initials": "Sarah",
+      "accumulatedSeconds": 6.107882352941175,
+      "rank": 17
+    },
+    {
+      "id": "duck-mpye4pd1-3glj",
+      "initials": "Jenny",
+      "accumulatedSeconds": 5.260111111111107,
+      "rank": 18
+    },
+    {
+      "id": "duck-mpye4wcd-fdbq",
+      "initials": "CC",
+      "accumulatedSeconds": 4.3841052631578945,
+      "rank": 19
+    },
+    {
+      "id": "duck-mpye53ze-4rhk",
+      "initials": "First Place Guy",
+      "accumulatedSeconds": 3.74505,
+      "rank": 20
+    },
+    {
+      "id": "duck-mpye5o0j-bldb",
+      "initials": "Winner!!!",
+      "accumulatedSeconds": 2.4495000000000005,
+      "rank": 21
+    },
+    {
+      "id": "duck-mpye5wsp-2tni",
+      "initials": "JWheezy",
+      "accumulatedSeconds": 3.4903863636363615,
+      "rank": 22
+    },
+    {
+      "id": "duck-mpye68sh-mms4",
+      "initials": "Kaylin",
+      "accumulatedSeconds": 1.010195652173913,
+      "rank": 23
+    },
+    {
+      "id": "duck-mpye6f32-rvir",
+      "initials": "BobbieG",
+      "accumulatedSeconds": 0.5289999999999999,
+      "rank": 24
+    },
+    {
+      "id": "duck-mpye6nyn-8xf0",
+      "initials": "Tweak",
+      "accumulatedSeconds": 0.33838,
+      "rank": 25
+    }
+  ],
+  "heldSince": "2026-06-03T18:20:49.395Z"
 }
