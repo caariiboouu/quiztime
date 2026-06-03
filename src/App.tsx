@@ -5,6 +5,7 @@ import { AFTrivia } from "./components/games/AFTrivia";
 import { CookieFace } from "./components/games/CookieFace";
 import { CarrotInABox } from "./components/games/CarrotInABox";
 import { DuckHours } from "./components/DuckHours";
+import { ComingSoon } from "./components/ComingSoon";
 import { AdminPanel } from "./components/admin/AdminPanel";
 import { GAMES } from "./data/games";
 import type { GameId } from "./types";
@@ -31,6 +32,10 @@ function App() {
     null,
   );
   const [adminOpen, setAdminOpen] = useState(false);
+  const [unlocked, setUnlocked] = usePersistentState<boolean>(
+    "quiztime.unlocked",
+    false,
+  );
   const goHome = () => setActiveGame(null);
   const hash = useHashRoute();
 
@@ -47,6 +52,8 @@ function App() {
       />
     );
   }
+
+  if (!unlocked) return <ComingSoon onUnlock={() => setUnlocked(true)} />;
 
   if (adminOpen) return <AdminPanel onExit={() => setAdminOpen(false)} />;
 
