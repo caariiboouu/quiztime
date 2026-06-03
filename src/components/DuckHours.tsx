@@ -175,10 +175,66 @@ export function DuckHours({ onExit }: DuckHoursProps) {
           winner.
         </p>
 
+        {ranked.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-neutral-300 bg-white p-10 text-center text-neutral-500">
+            No participants yet. Add some from the admin panel.
+          </div>
+        ) : (
+          <ol className="space-y-3">
+            {ranked.map((holder, index) => {
+              const isHolding = holder.rank === 1;
+              const isRanked = holder.rank !== null;
+              const total = liveSeconds(data, holder.id, now);
+              return (
+                <li
+                  key={holder.id}
+                  className={`flex items-center gap-4 rounded-xl border p-4 shadow-sm ${
+                    isHolding
+                      ? "border-amber-400 bg-amber-50"
+                      : "border-neutral-200 bg-white"
+                  }`}
+                >
+                  <span className="w-8 text-center text-lg font-semibold tabular-nums text-neutral-400">
+                    {index + 1}
+                  </span>
+                  <span className="flex min-w-0 flex-1 items-center gap-3">
+                    <span className="truncate text-xl font-bold tracking-wide text-neutral-900">
+                      {holder.initials || "—"}
+                    </span>
+                    {isHolding && <span className="text-xl">🦆</span>}
+                  </span>
+                  {isRanked ? (
+                    <span
+                      className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        isHolding
+                          ? "bg-amber-200 text-amber-900"
+                          : "bg-neutral-100 text-neutral-600"
+                      }`}
+                    >
+                      {isHolding ? "holding" : ordinal(holder.rank!)} ·{" "}
+                      {fractionLabel(holder.rank)}
+                    </span>
+                  ) : (
+                    <span className="whitespace-nowrap rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-400">
+                      benched
+                    </span>
+                  )}
+                  <span
+                    className={`w-36 text-right text-xl font-semibold tabular-nums ${
+                      isHolding ? "text-amber-900" : "text-neutral-700"
+                    }`}
+                  >
+                    {formatDuration(total, isRanked && anyRunning)}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+
         {data.holders.length > 0 && (
-          <div className="mb-8 rounded-xl border border-neutral-200 bg-white p-4">
+          <div className="mt-8 rounded-xl border border-neutral-200 bg-white p-4">
             <p className="text-sm text-neutral-600">
-              Name spelled wrong?{" "}
               <button
                 type="button"
                 onClick={() => setShowForm((v) => !v)}
@@ -235,63 +291,6 @@ export function DuckHours({ onExit }: DuckHoursProps) {
               </>
             )}
           </div>
-        )}
-
-        {ranked.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-neutral-300 bg-white p-10 text-center text-neutral-500">
-            No participants yet. Add some from the admin panel.
-          </div>
-        ) : (
-          <ol className="space-y-3">
-            {ranked.map((holder, index) => {
-              const isHolding = holder.rank === 1;
-              const isRanked = holder.rank !== null;
-              const total = liveSeconds(data, holder.id, now);
-              return (
-                <li
-                  key={holder.id}
-                  className={`flex items-center gap-4 rounded-xl border p-4 shadow-sm ${
-                    isHolding
-                      ? "border-amber-400 bg-amber-50"
-                      : "border-neutral-200 bg-white"
-                  }`}
-                >
-                  <span className="w-8 text-center text-lg font-semibold tabular-nums text-neutral-400">
-                    {index + 1}
-                  </span>
-                  <span className="flex min-w-0 flex-1 items-center gap-3">
-                    <span className="truncate text-xl font-bold tracking-wide text-neutral-900">
-                      {holder.initials || "—"}
-                    </span>
-                    {isHolding && <span className="text-xl">🦆</span>}
-                  </span>
-                  {isRanked ? (
-                    <span
-                      className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        isHolding
-                          ? "bg-amber-200 text-amber-900"
-                          : "bg-neutral-100 text-neutral-600"
-                      }`}
-                    >
-                      {isHolding ? "holding" : ordinal(holder.rank!)} ·{" "}
-                      {fractionLabel(holder.rank)}
-                    </span>
-                  ) : (
-                    <span className="whitespace-nowrap rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-400">
-                      benched
-                    </span>
-                  )}
-                  <span
-                    className={`w-36 text-right text-xl font-semibold tabular-nums ${
-                      isHolding ? "text-amber-900" : "text-neutral-700"
-                    }`}
-                  >
-                    {formatDuration(total, isRanked && anyRunning)}
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
         )}
       </main>
     </div>
