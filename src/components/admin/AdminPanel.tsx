@@ -1,13 +1,16 @@
 import { useCallback, useRef, useState } from "react";
 import bundledQuiz from "../../data/quiz.json";
 import bundledTrivia from "../../data/afTrivia.json";
-import type { QuizData, TriviaData } from "../../types";
+import bundledDuck from "../../data/duckHours.json";
+import type { DuckHoursData, QuizData, TriviaData } from "../../types";
 import { useOverridableJson } from "../../hooks/useOverridableJson";
 import { NavBar } from "../NavBar";
 import { QUIZ_OVERRIDE_KEY } from "../quiz/QuizGame";
 import { TRIVIA_OVERRIDE_KEY } from "../games/AFTrivia";
+import { DUCK_OVERRIDE_KEY } from "../DuckHours";
 import { QuizEditor } from "./QuizEditor";
 import { TriviaEditor } from "./TriviaEditor";
+import { DuckEditor } from "./DuckEditor";
 import { GithubError, getFile, putFile } from "../../lib/github";
 import {
   decryptString,
@@ -17,6 +20,7 @@ import {
 
 const QUIZ_PATH = "src/data/quiz.json";
 const TRIVIA_PATH = "src/data/afTrivia.json";
+const DUCK_PATH = "src/data/duckHours.json";
 const AUTH_PATH = "public/auth.enc.json";
 const AUTH_URL = `${import.meta.env.BASE_URL}auth.enc.json`;
 const TOKEN_SESSION_KEY = "quiztime.admin.token";
@@ -312,7 +316,11 @@ function Inner({
     TRIVIA_OVERRIDE_KEY,
     bundledTrivia as TriviaData,
   );
-  const [tab, setTab] = useState<"quiz" | "trivia">("quiz");
+  const duck = useOverridableJson<DuckHoursData>(
+    DUCK_OVERRIDE_KEY,
+    bundledDuck as DuckHoursData,
+  );
+  const [tab, setTab] = useState<"quiz" | "trivia" | "duck">("quiz");
   const quizImportRef = useRef<HTMLInputElement>(null);
   const triviaImportRef = useRef<HTMLInputElement>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ state: "idle" });
@@ -340,15 +348,20 @@ function Inner({
     if (tab === "quiz") {
       if (confirm("Discard your quiz edits and return to the deployed defaults?"))
         quiz.reset();
-    } else {
+    } else if (tab === "trivia") {
       if (confirm("Discard your AF Trivia edits and return to the deployed defaults?"))
         trivia.reset();
+    } else {
+      if (confirm("Discard your Duck Hours edits and return to the deployed defaults?"))
+        duck.reset();
     }
   };
 
   const saveToRepo = async () => {
-    const path = tab === "quiz" ? QUIZ_PATH : TRIVIA_PATH;
-    const payload = tab === "quiz" ? quiz.data : trivia.data;
+    const path =
+      tab === "quiz" ? QUIZ_PATH : tab === "trivia" ? TRIVIA_PATH : DUCK_PATH;
+    const payload =
+      tab === "quiz" ? quiz.data : tab === "trivia" ? trivia.data : duck.data;
     const content = JSON.stringify(payload, null, 2) + "\n";
     setSaveStatus({ state: "saving" });
     try {
@@ -356,9 +369,11 @@ function Inner({
       const summary =
         tab === "quiz"
           ? `Update ??? quiz content (${(payload as QuizData).categories.length} categories)`
-          : `Update AF Trivia content (${(payload as TriviaData).questions.length} questions)`;
+          : tab === "trivia"
+            ? `Update AF Trivia content (${(payload as TriviaData).questions.length} questions)`
+            : `Update Ceramic Duck Hours (${(payload as DuckHoursData).holders.length} holders)`;
       await putFile(token, path, content, `${summary} via admin panel`, existing?.sha);
-      (tab === "quiz" ? quiz : trivia).markSaved();
+      active.markSaved();
       setSaveStatus({
         state: "success",
         message: "Committed — Pages will rebuild in about a minute.",
@@ -374,7 +389,7 @@ function Inner({
     }
   };
 
-  const active = tab === "quiz" ? quiz : trivia;
+  const active = tab === "quiz" ? quiz : tab === "trivia" ? trivia : duck;
 
   return (
     <div className="flex h-full flex-col">
@@ -404,6 +419,17 @@ function Inner({
           >
             AF Trivia
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("duck")}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+              tab === "duck"
+                ? "bg-neutral-900 text-white"
+                : "border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100"
+            }`}
+          >
+            Duck Hours
+          </button>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {active.isDirty && (
@@ -423,23 +449,27 @@ function Inner({
               type="button"
               onClick={() => {
                 if (tab === "quiz") downloadJson("quiz.json", quiz.data);
-                else downloadJson("afTrivia.json", trivia.data);
+                else if (tab === "trivia")
+                  downloadJson("afTrivia.json", trivia.data);
+                else downloadJson("duckHours.json", duck.data);
               }}
               className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
             >
               Export
             </button>
-            <button
-              type="button"
-              onClick={() =>
-                tab === "quiz"
-                  ? quizImportRef.current?.click()
-                  : triviaImportRef.current?.click()
-              }
-              className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
-            >
-              Import
-            </button>
+            {tab !== "duck" && (
+              <button
+                type="button"
+                onClick={() =>
+                  tab === "quiz"
+                    ? quizImportRef.current?.click()
+                    : triviaImportRef.current?.click()
+                }
+                className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+              >
+                Import
+              </button>
+            )}
             <input
               ref={quizImportRef}
               type="file"
@@ -500,8 +530,10 @@ function Inner({
 
       {tab === "quiz" ? (
         <QuizEditor data={quiz.data} onChange={quiz.setData} />
-      ) : (
+      ) : tab === "trivia" ? (
         <TriviaEditor data={trivia.data} onChange={trivia.setData} />
+      ) : (
+        <DuckEditor data={duck.data} onChange={duck.setData} />
       )}
     </div>
   );

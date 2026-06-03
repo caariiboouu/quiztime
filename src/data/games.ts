@@ -25,4 +25,10 @@ export const GAMES: Game[] = [
     description: "The main event.",
     available: true,
   },
+  {
+    id: "duck-hours",
+    name: "Ceramic Duck Hours",
+    description: "The trophy leaderboard. Who's logged the most duck time?",
+    available: true,
+  },
 ];

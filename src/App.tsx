@@ -4,6 +4,7 @@ import { QuizGame } from "./components/quiz/QuizGame";
 import { AFTrivia } from "./components/games/AFTrivia";
 import { CookieFace } from "./components/games/CookieFace";
 import { CarrotInABox } from "./components/games/CarrotInABox";
+import { DuckHours } from "./components/DuckHours";
 import { AdminPanel } from "./components/admin/AdminPanel";
 import { GAMES } from "./data/games";
 import type { GameId } from "./types";
@@ -34,6 +35,8 @@ function App() {
       return <AFTrivia onExit={goHome} />;
     case "mystery-quiz":
       return <QuizGame onExit={goHome} />;
+    case "duck-hours":
+      return <DuckHours onExit={goHome} />;
     default:
       return (
         <Hub
