@@ -35,13 +35,16 @@ export type DuckHolder = {
   id: string;
   initials: string;
   accumulatedSeconds: number;
+  /**
+   * Current standing: 1 = holds the duck (full rate), 2 = ½ rate, 3 = ⅓, etc.
+   * null = benched (earns nothing right now).
+   */
+  rank: number | null;
 };
 
 export type DuckHoursData = {
   holders: DuckHolder[];
-  /** id of the holder currently holding the ceramic duck, or null if nobody. */
-  currentHolderId: string | null;
-  /** ISO timestamp of when the current holder picked up the duck, or null. */
+  /** ISO timestamp of when the current standings took effect, or null. */
   heldSince: string | null;
 };
 
