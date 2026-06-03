@@ -112,7 +112,7 @@ export function DuckHours({ onExit }: DuckHoursProps) {
       <NavBar title="Ceramic Duck Hours" onBack={onExit} />
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
         <h2 className="mb-2 text-3xl font-semibold tracking-tight text-neutral-900">
-          🦆 The Ceramic Duck
+          🦆 Ceramic Duck Hours Leaderboard
         </h2>
         <p className="mb-2 text-neutral-600">
           Duck-hours accumulate for everyone in the standings. The current
