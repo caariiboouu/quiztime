@@ -1,5 +1,7 @@
-import type { DuckHolder, DuckHoursData } from "../../types";
+import { useState } from "react";
+import type { BonusAward, DuckHolder, DuckHoursData } from "../../types";
 import {
+  formatDuration,
   fractionLabel,
   normalizeDuckData,
   ordinal,
@@ -31,16 +33,52 @@ function bankAll(data: DuckHoursData, nowMs: number): DuckHolder[] {
 export function DuckEditor({ data: rawData, onChange }: DuckEditorProps) {
   const data = normalizeDuckData(rawData);
 
+  const bonusLog = data.bonusLog ?? [];
+
+  const commit = (holders: DuckHolder[], newAwards?: BonusAward[]) => {
+    const anyRanked = holders.some((h) => h.rank !== null);
+    onChange({
+      holders,
+      heldSince: anyRanked ? new Date().toISOString() : null,
+      bonusLog: newAwards ? [...bonusLog, ...newAwards] : bonusLog,
+    });
+  };
+
   // Bank elapsed time at the *current* rates, apply the change, then restart
   // the clock from now. Running every mutation through here keeps totals exact
   // no matter how often the standings are edited.
   const repaint = (mutate: (holders: DuckHolder[]) => DuckHolder[]) => {
     const banked = bankAll(data, Date.now());
-    const next = mutate(banked.map((h) => ({ ...h })));
-    const anyRanked = next.some((h) => h.rank !== null);
+    commit(mutate(banked.map((h) => ({ ...h }))));
+  };
+
+  const awardBonus = (id: string, seconds: number, reason: string) => {
+    if (seconds <= 0) return;
+    const banked = bankAll(data, Date.now()).map((h) => ({ ...h }));
+    const target = banked.find((h) => h.id === id);
+    if (!target) return;
+    target.accumulatedSeconds += seconds;
+    commit(banked, [
+      {
+        at: new Date().toISOString(),
+        holderId: id,
+        seconds,
+        ...(reason ? { reason } : {}),
+      },
+    ]);
+  };
+
+  const clearBonusLog = () => {
+    if (
+      !confirm(
+        "Clear the bonus log? Awarded hours stay in the totals; only the history is removed.",
+      )
+    )
+      return;
     onChange({
-      holders: next,
-      heldSince: anyRanked ? new Date().toISOString() : null,
+      holders: data.holders,
+      heldSince: data.heldSince,
+      bonusLog: [],
     });
   };
 
@@ -194,6 +232,12 @@ export function DuckEditor({ data: rawData, onChange }: DuckEditorProps) {
                   <span>m</span>
                 </div>
 
+                <BonusControl
+                  onAward={(seconds, reason) =>
+                    awardBonus(h.id, seconds, reason)
+                  }
+                />
+
                 <button
                   type="button"
                   onClick={() => removeHolder(h.id)}
@@ -207,6 +251,47 @@ export function DuckEditor({ data: rawData, onChange }: DuckEditorProps) {
         </ul>
       )}
 
+      {bonusLog.length > 0 && (
+        <div className="mt-8">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-neutral-700">
+              Bonus log ({bonusLog.length})
+            </h3>
+            <button
+              type="button"
+              onClick={clearBonusLog}
+              className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-100"
+            >
+              Clear log
+            </button>
+          </div>
+          <ul className="space-y-1 text-sm">
+            {[...bonusLog].reverse().map((b, i) => {
+              const who =
+                data.holders.find((h) => h.id === b.holderId)?.initials ||
+                "(removed)";
+              return (
+                <li
+                  key={`${b.at}-${i}`}
+                  className="flex flex-wrap items-baseline gap-x-3 rounded-md border border-neutral-200 bg-white px-3 py-1.5"
+                >
+                  <span className="tabular-nums text-neutral-400">
+                    {b.at.slice(0, 16).replace("T", " ")}
+                  </span>
+                  <span className="font-medium text-neutral-800">{who}</span>
+                  <span className="tabular-nums font-semibold text-emerald-700">
+                    +{formatDuration(b.seconds)}
+                  </span>
+                  {b.reason && (
+                    <span className="text-neutral-500">— {b.reason}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       {anyRanked && (
         <p className="mt-4 text-xs text-neutral-500">
           The clock is running. Remember to <strong>Save to repo</strong> so
@@ -215,5 +300,88 @@ export function DuckEditor({ data: rawData, onChange }: DuckEditorProps) {
         </p>
       )}
     </main>
+  );
+}
+
+/** Per-row control to add bonus duck-hours on top of a participant's total. */
+function BonusControl({
+  onAward,
+}: {
+  onAward: (seconds: number, reason: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [h, setH] = useState("");
+  const [m, setM] = useState("");
+  const [reason, setReason] = useState("");
+  const seconds = (Number(h) || 0) * 3600 + (Number(m) || 0) * 60;
+
+  const reset = () => {
+    setH("");
+    setM("");
+    setReason("");
+    setOpen(false);
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="rounded-md border border-emerald-300 bg-white px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+      >
+        + Bonus
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex basis-full flex-wrap items-center gap-2 border-t border-neutral-200 pt-2">
+      <span className="text-xs font-medium text-neutral-600">Award bonus:</span>
+      <input
+        type="number"
+        min={0}
+        value={h}
+        placeholder="0"
+        onChange={(e) => setH(e.target.value)}
+        className="w-14 rounded-md border border-neutral-300 bg-white px-2 py-1 text-right text-sm tabular-nums focus:border-neutral-500 focus:outline-none"
+      />
+      <span className="text-sm text-neutral-700">h</span>
+      <input
+        type="number"
+        min={0}
+        max={59}
+        value={m}
+        placeholder="0"
+        onChange={(e) => setM(e.target.value)}
+        className="w-14 rounded-md border border-neutral-300 bg-white px-2 py-1 text-right text-sm tabular-nums focus:border-neutral-500 focus:outline-none"
+      />
+      <span className="text-sm text-neutral-700">m</span>
+      <input
+        type="text"
+        maxLength={60}
+        value={reason}
+        placeholder="reason (optional)"
+        onChange={(e) => setReason(e.target.value)}
+        className="min-w-[8rem] flex-1 rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm focus:border-neutral-500 focus:outline-none"
+      />
+      <button
+        type="button"
+        disabled={seconds <= 0}
+        onClick={() => {
+          onAward(seconds, reason.trim());
+          reset();
+        }}
+        className="rounded-md bg-emerald-700 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        Add
+      </button>
+      <button
+        type="button"
+        onClick={reset}
+        className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-100"
+      >
+        Cancel
+      </button>
+    </div>
   );
 }

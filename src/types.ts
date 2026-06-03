@@ -42,10 +42,21 @@ export type DuckHolder = {
   rank: number | null;
 };
 
+export type BonusAward = {
+  /** ISO timestamp of when the bonus was awarded. */
+  at: string;
+  holderId: string;
+  /** Seconds added to the holder's total. */
+  seconds: number;
+  reason?: string;
+};
+
 export type DuckHoursData = {
   holders: DuckHolder[];
   /** ISO timestamp of when the current standings took effect, or null. */
   heldSince: string | null;
+  /** History of manually-awarded bonus hours. */
+  bonusLog?: BonusAward[];
 };
 
 export type TriviaData = {

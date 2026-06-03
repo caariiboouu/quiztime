@@ -56,7 +56,11 @@ export function normalizeDuckData(
           ? 1
           : null,
   }));
-  return { holders, heldSince: raw.heldSince ?? null };
+  return {
+    holders,
+    heldSince: raw.heldSince ?? null,
+    bonusLog: raw.bonusLog ?? [],
+  };
 }
 
 /** Banked seconds plus, for ranked holders, live elapsed time at their rate. */
