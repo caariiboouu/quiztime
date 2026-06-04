@@ -3,7 +3,7 @@
     {
       "id": "duck-mpydfdya-py15",
       "initials": "RC Cola",
-      "accumulatedSeconds": 2583051.6346666673,
+      "accumulatedSeconds": 2583320.3980000005,
       "rank": 3
     },
     {
@@ -27,7 +27,7 @@
     {
       "id": "duck-mpye1kgg-t8fe",
       "initials": "Ldot",
-      "accumulatedSeconds": 516938.10146666656,
+      "accumulatedSeconds": 517206.86479999986,
       "rank": 3
     },
     {
@@ -39,7 +39,7 @@
     {
       "id": "duck-mpye1v0d-depg",
       "initials": "HAWK",
-      "accumulatedSeconds": 369355.36080952367,
+      "accumulatedSeconds": 369624.124142857,
       "rank": 3
     },
     {
@@ -58,7 +58,7 @@
       "id": "duck-mpye2qfh-g3cb",
       "initials": "Lady d",
       "accumulatedSeconds": 259071.45219999997,
-      "rank": null
+      "rank": 2
     },
     {
       "id": "duck-mpye31bm-7akj",
@@ -111,13 +111,13 @@
     {
       "id": "duck-mpye4wcd-fdbq",
       "initials": "CC",
-      "accumulatedSeconds": 136746.12589473688,
+      "accumulatedSeconds": 137552.41589473689,
       "rank": 1
     },
     {
       "id": "duck-mpye53ze-4rhk",
       "initials": "Joseph S",
-      "accumulatedSeconds": 129143.25335000001,
+      "accumulatedSeconds": 129949.54335,
       "rank": 1
     },
     {
@@ -151,6 +151,6 @@
       "rank": null
     }
   ],
-  "heldSince": "2026-06-04T15:48:47.076Z",
+  "heldSince": "2026-06-04T16:02:13.367Z",
   "bonusLog": []
 }
