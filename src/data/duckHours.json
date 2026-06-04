@@ -3,7 +3,7 @@
     {
       "id": "duck-mpydfdya-py15",
       "initials": "RC Cola",
-      "accumulatedSeconds": 2582723.021,
+      "accumulatedSeconds": 2582781.699666667,
       "rank": 3
     },
     {
@@ -27,7 +27,7 @@
     {
       "id": "duck-mpye1kgg-t8fe",
       "initials": "Ldot",
-      "accumulatedSeconds": 516609.48779999994,
+      "accumulatedSeconds": 516668.1664666666,
       "rank": 3
     },
     {
@@ -39,7 +39,7 @@
     {
       "id": "duck-mpye1v0d-depg",
       "initials": "HAWK",
-      "accumulatedSeconds": 369026.74714285706,
+      "accumulatedSeconds": 369085.42580952373,
       "rank": 3
     },
     {
@@ -58,7 +58,7 @@
       "id": "duck-mpye2qfh-g3cb",
       "initials": "Lady d",
       "accumulatedSeconds": 258274.19619999998,
-      "rank": null
+      "rank": 1
     },
     {
       "id": "duck-mpye31bm-7akj",
@@ -111,8 +111,8 @@
     {
       "id": "duck-mpye4wcd-fdbq",
       "initials": "CC",
-      "accumulatedSeconds": 135934.33889473687,
-      "rank": null
+      "accumulatedSeconds": 135936.32089473685,
+      "rank": 1
     },
     {
       "id": "duck-mpye53ze-4rhk",
@@ -151,6 +151,6 @@
       "rank": null
     }
   ],
-  "heldSince": "2026-06-04T15:32:21.234Z",
+  "heldSince": "2026-06-04T15:35:17.270Z",
   "bonusLog": []
 }
