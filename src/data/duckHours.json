@@ -3,8 +3,8 @@
     {
       "id": "duck-mpydfdya-py15",
       "initials": "RC Cola",
-      "accumulatedSeconds": 2583374.841333334,
-      "rank": 3
+      "accumulatedSeconds": 3741626.398333334,
+      "rank": null
     },
     {
       "id": "duck-mpye0xgz-5u5d",
@@ -27,8 +27,8 @@
     {
       "id": "duck-mpye1kgg-t8fe",
       "initials": "Ldot",
-      "accumulatedSeconds": 517261.3081333332,
-      "rank": 3
+      "accumulatedSeconds": 1675513.5504666667,
+      "rank": null
     },
     {
       "id": "duck-mpye1q4d-f04q",
@@ -39,8 +39,8 @@
     {
       "id": "duck-mpye1v0d-depg",
       "initials": "HAWK",
-      "accumulatedSeconds": 369678.56747619034,
-      "rank": 3
+      "accumulatedSeconds": 1527931.1314761906,
+      "rank": null
     },
     {
       "id": "duck-mpye21go-h1sk",
@@ -57,14 +57,14 @@
     {
       "id": "duck-mpye2qfh-g3cb",
       "initials": "Lady d",
-      "accumulatedSeconds": 259153.11719999998,
-      "rank": 2
+      "accumulatedSeconds": 1996532.6567,
+      "rank": null
     },
     {
       "id": "duck-mpye31bm-7akj",
       "initials": "Lane, Son of Nel",
-      "accumulatedSeconds": 234794.86027272727,
-      "rank": 2
+      "accumulatedSeconds": 1972174.9712727272,
+      "rank": null
     },
     {
       "id": "duck-mpye3cua-52n1",
@@ -111,14 +111,14 @@
     {
       "id": "duck-mpye4wcd-fdbq",
       "initials": "CC",
-      "accumulatedSeconds": 137715.74589473687,
-      "rank": 1
+      "accumulatedSeconds": 3612478.470894737,
+      "rank": null
     },
     {
       "id": "duck-mpye53ze-4rhk",
       "initials": "Joseph S",
-      "accumulatedSeconds": 130112.87335000001,
-      "rank": 1
+      "accumulatedSeconds": 3604876.42135,
+      "rank": null
     },
     {
       "id": "duck-mpye5o0j-bldb",
@@ -151,6 +151,6 @@
       "rank": null
     }
   ],
-  "heldSince": "2026-06-04T16:04:56.697Z",
+  "heldSince": null,
   "bonusLog": []
 }
