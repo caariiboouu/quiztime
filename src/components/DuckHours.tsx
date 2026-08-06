@@ -15,6 +15,25 @@ export function rankFraction(rank: number | null): number {
   return rank && rank >= 1 ? 1 / rank : 0;
 }
 
+/**
+ * Cap on how much time counts toward accrual since the standings last
+ * changed. Meetings land on an irregular schedule, so without a cap
+ * whoever goes the longest between quizzes would rack up an unfair lead;
+ * capping at 30 days keeps a single stretch worth at most a month.
+ */
+export const MAX_ACCRUAL_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Milliseconds elapsed since `heldSince`, clamped to [0, MAX_ACCRUAL_MS]. */
+export function cappedElapsedMs(
+  heldSince: string | null,
+  now: number,
+): number {
+  if (!heldSince) return 0;
+  const since = Date.parse(heldSince);
+  if (Number.isNaN(since)) return 0;
+  return Math.min(Math.max(0, now - since), MAX_ACCRUAL_MS);
+}
+
 const FRACTION_GLYPH: Record<number, string> = {
   1: "1×",
   2: "½×",
@@ -71,14 +90,8 @@ export function liveSeconds(
 ): number {
   const holder = data.holders.find((h) => h.id === holderId);
   if (!holder) return 0;
-  let total = holder.accumulatedSeconds;
-  if (data.heldSince) {
-    const since = Date.parse(data.heldSince);
-    if (!Number.isNaN(since)) {
-      total += Math.max(0, (now - since) / 1000) * rankFraction(holder.rank);
-    }
-  }
-  return total;
+  const elapsedSeconds = cappedElapsedMs(data.heldSince, now) / 1000;
+  return holder.accumulatedSeconds + elapsedSeconds * rankFraction(holder.rank);
 }
 
 /** "12h 04m" or, with seconds, "12h 04m 33s". */
@@ -172,7 +185,8 @@ export function DuckHours({ onExit }: DuckHoursProps) {
         </p>
         <p className="mb-6 text-sm text-neutral-500">
           Ranked by total time, so a steady runner-up can out-earn an occasional
-          winner.
+          winner. Since meetings land on an irregular schedule, only the most
+          recent 30 days since standings last changed count toward accrual.
         </p>
 
         {ranked.length === 0 ? (

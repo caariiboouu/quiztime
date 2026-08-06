@@ -1,81 +1,165 @@
 {
   "holders": [
     {
-      "id": "duck-mpydfdya-py15",
-      "initials": "RC Cola",
-      "accumulatedSeconds": 3741626.398333334,
-      "rank": null
-    },
-    {
-      "id": "duck-mpye0xgz-5u5d",
-      "initials": "TT",
-      "accumulatedSeconds": 1291361.6285,
-      "rank": null
-    },
-    {
-      "id": "duck-mpye13qr-cmn0",
-      "initials": "4X4",
-      "accumulatedSeconds": 860908.1286666667,
-      "rank": null
-    },
-    {
-      "id": "duck-mpye1acc-0h1o",
-      "initials": "2Js",
-      "accumulatedSeconds": 645681.36925,
-      "rank": null
-    },
-    {
       "id": "duck-mpye1kgg-t8fe",
       "initials": "Ldot",
       "accumulatedSeconds": 1675513.5504666667,
-      "rank": null
-    },
-    {
-      "id": "duck-mpye1q4d-f04q",
-      "initials": "Meg",
-      "accumulatedSeconds": 430454.63800000004,
-      "rank": null
+      "rank": 1
     },
     {
       "id": "duck-mpye1v0d-depg",
       "initials": "HAWK",
       "accumulatedSeconds": 1527931.1314761906,
-      "rank": null
-    },
-    {
-      "id": "duck-mpye21go-h1sk",
-      "initials": "Marcie",
-      "accumulatedSeconds": 322841.24387500004,
-      "rank": null
-    },
-    {
-      "id": "duck-mpye273l-7l0l",
-      "initials": "A-Wall",
-      "accumulatedSeconds": 286971.08111111115,
-      "rank": null
+      "rank": 2
     },
     {
       "id": "duck-mpye2qfh-g3cb",
-      "initials": "Lady d",
+      "initials": "Lady D",
       "accumulatedSeconds": 1996532.6567,
-      "rank": null
+      "rank": 3
     },
     {
-      "id": "duck-mpye31bm-7akj",
-      "initials": "Lane, Son of Nel",
-      "accumulatedSeconds": 1972174.9712727272,
-      "rank": null
+      "id": "duck-6a74a952-sz4e",
+      "initials": "NTKT",
+      "accumulatedSeconds": 0,
+      "rank": 4
     },
     {
-      "id": "duck-mpye3cua-52n1",
-      "initials": "Pabs",
-      "accumulatedSeconds": 215228.7169166667,
-      "rank": null
+      "id": "duck-mpydfdya-py15",
+      "initials": "Open Can Cunningham",
+      "accumulatedSeconds": 3741626.398333334,
+      "rank": 5
+    },
+    {
+      "id": "duck-mpye0xgz-5u5d",
+      "initials": "TT",
+      "accumulatedSeconds": 1291361.6285,
+      "rank": 6
     },
     {
       "id": "duck-mpye3khv-3tsj",
       "initials": "barnes",
       "accumulatedSeconds": 198672.7436153846,
+      "rank": 7
+    },
+    {
+      "id": "duck-mpye6f32-rvir",
+      "initials": "Bobbie G",
+      "accumulatedSeconds": 107614.93308333337,
+      "rank": 8
+    },
+    {
+      "id": "duck-mpye4wcd-fdbq",
+      "initials": "CC",
+      "accumulatedSeconds": 3612478.470894737,
+      "rank": 9
+    },
+    {
+      "id": "duck-6a74a953-e227",
+      "initials": "Quack-y",
+      "accumulatedSeconds": 0,
+      "rank": 10
+    },
+    {
+      "id": "duck-mpye1q4d-f04q",
+      "initials": "Meg",
+      "accumulatedSeconds": 430454.63800000004,
+      "rank": 11
+    },
+    {
+      "id": "duck-6a74a954-tq4j",
+      "initials": "Pres G",
+      "accumulatedSeconds": 0,
+      "rank": 12
+    },
+    {
+      "id": "duck-mpye68sh-mms4",
+      "initials": "Kaylin",
+      "accumulatedSeconds": 112293.79173913044,
+      "rank": 13
+    },
+    {
+      "id": "duck-mpye13qr-cmn0",
+      "initials": "4X4",
+      "accumulatedSeconds": 860908.1286666667,
+      "rank": 14
+    },
+    {
+      "id": "duck-6a74a955-1j1u",
+      "initials": "KT",
+      "accumulatedSeconds": 0,
+      "rank": 15
+    },
+    {
+      "id": "duck-mpye5wsp-2tni",
+      "initials": "JWeezy",
+      "accumulatedSeconds": 117398.00622727272,
+      "rank": 16
+    },
+    {
+      "id": "duck-6a74a956-xo8j",
+      "initials": "Syd",
+      "accumulatedSeconds": 0,
+      "rank": 17
+    },
+    {
+      "id": "duck-6a74a957-c97i",
+      "initials": "M&Ms",
+      "accumulatedSeconds": 0,
+      "rank": 18
+    },
+    {
+      "id": "duck-mpye3cua-52n1",
+      "initials": "Petty Pablo",
+      "accumulatedSeconds": 215228.7169166667,
+      "rank": 19
+    },
+    {
+      "id": "duck-6a74a958-dufs",
+      "initials": "Natester",
+      "accumulatedSeconds": 0,
+      "rank": 20
+    },
+    {
+      "id": "duck-mpye273l-7l0l",
+      "initials": "A-Wall",
+      "accumulatedSeconds": 286971.08111111115,
+      "rank": 21
+    },
+    {
+      "id": "duck-mpye31bm-7akj",
+      "initials": "Lane, Son of Nel",
+      "accumulatedSeconds": 1972174.9712727272,
+      "rank": 22
+    },
+    {
+      "id": "duck-mpye1acc-0h1o",
+      "initials": "2Js",
+      "accumulatedSeconds": 645681.36925,
+      "rank": 23
+    },
+    {
+      "id": "duck-6a74a959-n0ty",
+      "initials": "jo",
+      "accumulatedSeconds": 0,
+      "rank": 24
+    },
+    {
+      "id": "duck-6a74a95a-008x",
+      "initials": "Taylor",
+      "accumulatedSeconds": 0,
+      "rank": 25
+    },
+    {
+      "id": "duck-mpye5o0j-bldb",
+      "initials": "ImaWinner!!!",
+      "accumulatedSeconds": 122988.32671428572,
+      "rank": 26
+    },
+    {
+      "id": "duck-mpye21go-h1sk",
+      "initials": "Marcie",
+      "accumulatedSeconds": 322841.24387500004,
       "rank": null
     },
     {
@@ -109,39 +193,9 @@
       "rank": null
     },
     {
-      "id": "duck-mpye4wcd-fdbq",
-      "initials": "CC",
-      "accumulatedSeconds": 3612478.470894737,
-      "rank": null
-    },
-    {
       "id": "duck-mpye53ze-4rhk",
       "initials": "Joseph S",
       "accumulatedSeconds": 3604876.42135,
-      "rank": null
-    },
-    {
-      "id": "duck-mpye5o0j-bldb",
-      "initials": "Winner!!!",
-      "accumulatedSeconds": 122988.32671428572,
-      "rank": null
-    },
-    {
-      "id": "duck-mpye5wsp-2tni",
-      "initials": "JWheezy",
-      "accumulatedSeconds": 117398.00622727272,
-      "rank": null
-    },
-    {
-      "id": "duck-mpye68sh-mms4",
-      "initials": "Kaylin",
-      "accumulatedSeconds": 112293.79173913044,
-      "rank": null
-    },
-    {
-      "id": "duck-mpye6f32-rvir",
-      "initials": "BobbieG",
-      "accumulatedSeconds": 107614.93308333337,
       "rank": null
     },
     {
@@ -151,6 +205,6 @@
       "rank": null
     }
   ],
-  "heldSince": null,
+  "heldSince": "2026-08-06T15:37:07.000Z",
   "bonusLog": []
 }

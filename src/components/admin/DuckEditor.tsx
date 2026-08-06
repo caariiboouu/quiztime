@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { BonusAward, DuckHolder, DuckHoursData } from "../../types";
 import {
+  cappedElapsedMs,
   formatDuration,
   fractionLabel,
   normalizeDuckData,
@@ -19,10 +20,7 @@ function newHolderId(): string {
 
 /** Bank each ranked holder's live elapsed time (at their rate) into their total. */
 function bankAll(data: DuckHoursData, nowMs: number): DuckHolder[] {
-  if (!data.heldSince) return data.holders;
-  const since = Date.parse(data.heldSince);
-  if (Number.isNaN(since)) return data.holders;
-  const elapsed = Math.max(0, (nowMs - since) / 1000);
+  const elapsed = cappedElapsedMs(data.heldSince, nowMs) / 1000;
   if (!elapsed) return data.holders;
   return data.holders.map((h) => ({
     ...h,
@@ -151,7 +149,9 @@ export function DuckEditor({ data: rawData, onChange }: DuckEditorProps) {
         After a quiz, set each person's <strong>rank</strong> (1 = holds the
         duck). Rank 1 earns the full rate, 2nd earns ½×, 3rd ⅓×, and so on. Leave
         the rank blank to bench someone. Changing ranks banks the time earned so
-        far and restarts the clock at the new rates.
+        far and restarts the clock at the new rates. Only the most recent 30
+        days since the last change ever bank — a longer gap between quizzes
+        doesn't earn extra.
       </p>
 
       {data.holders.length === 0 ? (
