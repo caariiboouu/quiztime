@@ -6,6 +6,7 @@
  *   POST /api/rooms/:code/join   join as a player → { playerId, token }
  *   GET  /api/rooms/:code/ws     WebSocket (?host=<hostKey> or ?token=<token>)
  *   GET  /api/demo/ws            WebSocket: the public practice arena (no sign-up)
+ *   GET  /api/demo/stats         how the practice arena is doing (counts, recent errors)
  *   GET  /api/accounts           everyone who has an account (names, no secrets)
  *   POST /api/accounts           claim a Duck Hours entry or add someone new (+ PIN)
  *   POST /api/accounts/:id/login sign in on this device with the PIN
@@ -106,6 +107,9 @@ export default {
 
     if (url.pathname === "/api/demo/ws") {
       return env.DEMO.get(env.DEMO.idFromName("demo")).fetch(request);
+    }
+    if (url.pathname === "/api/demo/stats" && request.method === "GET") {
+      return json(await env.DEMO.get(env.DEMO.idFromName("demo")).getStats(), 200, origin);
     }
 
     if (url.pathname.startsWith("/api/accounts")) {

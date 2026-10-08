@@ -126,6 +126,14 @@ themselves: 20 s to walk, time's up, 7 s reveal, next. Computer ducks
 (`shared/arenaBots.ts`) top the crowd up to 12 at the start of each round. At
 most 40 people; it only runs while someone's connected. If the server can't
 be reached the page practises offline in the browser with the same rules.
+Players type a name for their duck when they arrive (or take a random duck
+name); a duplicate gets a number.
+
+How it's doing: `GET /api/demo/stats` (people now, peak, joins, clean leaves
+vs. dropped connections, rounds, the last few errors) since it last started.
+Each notable event is also one JSON log line (`wrangler tail`, or Workers →
+quiztime-live → Logs in the dashboard), though practice-arena lines only
+arrive once its connections close.
 
 ## Layout
 

@@ -44,6 +44,22 @@ const MAX_PRACTICE_NAME = 20;
 
 type Visitor = { ws: WebSocket; duck: DemoDuck; window: number; count: number };
 
+/** How the practice arena is doing, since it last started (counts only, no names). */
+export type DemoStats = {
+  since: string;
+  people: number;
+  peak: number;
+  joins: number;
+  /** Left by closing the page normally… */
+  leaves: number;
+  /** …or dropped without a goodbye (phone locked, network switched). */
+  drops: number;
+  rounds: number;
+  full: number;
+  /** The last few things that went wrong in our code. */
+  errors: { at: string; where: string; message: string }[];
+};
+
 export class Demo extends DurableObject<Env> {
   private visitors = new Map<string, Visitor>();
   private bots: DemoDuck[] = [];
@@ -56,6 +72,29 @@ export class Demo extends DurableObject<Env> {
   private timer: ReturnType<typeof setInterval> | null = null;
   private last = 0;
   private nextLook = 0;
+  private stats: DemoStats = {
+    since: new Date().toISOString(),
+    people: 0,
+    peak: 0,
+    joins: 0,
+    leaves: 0,
+    drops: 0,
+    rounds: 0,
+    full: 0,
+    errors: [],
+  };
+
+  /** For GET /api/demo/stats. */
+  async getStats(): Promise<DemoStats> {
+    return { ...this.stats, people: this.visitors.size };
+  }
+
+  /** Remember (and log) a failure in our code without taking the arena down. */
+  private failed(where: string, err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    this.stats.errors = [...this.stats.errors, { at: new Date().toISOString(), where, message }].slice(-5);
+    console.error(JSON.stringify({ event: "practice_error", where, message }));
+  }
 
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") {
@@ -64,6 +103,7 @@ export class Demo extends DurableObject<Env> {
     const { 0: client, 1: server } = new WebSocketPair();
     server.accept();
     if (this.visitors.size >= DEMO_MAX_PLAYERS) {
+      this.stats.full++;
       logEvent("practice_full", { people: this.visitors.size });
       this.send(server, { t: "full" });
       server.close(4002, "Practice arena is full");
@@ -79,16 +119,37 @@ export class Demo extends DurableObject<Env> {
     };
     const visitor: Visitor = { ws: server, duck, window: 0, count: 0 };
     this.visitors.set(duck.id, visitor);
-    server.addEventListener("message", (ev) => this.onMessage(visitor, ev.data));
-    const leave = () => this.leave(duck.id);
-    server.addEventListener("close", leave);
-    server.addEventListener("error", leave);
+    server.addEventListener("message", (ev) => {
+      try {
+        this.onMessage(visitor, ev.data);
+      } catch (err) {
+        this.failed("message", err);
+      }
+    });
+    server.addEventListener("close", (ev) => {
+      // Finish the goodbye handshake, then free their duck.
+      try {
+        server.close(ev.code === 1005 || ev.code === 1006 ? 1000 : ev.code, "bye");
+      } catch {
+        // already closed
+      }
+      this.leave(duck.id, ev.code === 1006 ? "drop" : "leave");
+    });
+    server.addEventListener("error", () => this.leave(duck.id, "drop"));
+    this.stats.joins++;
+    this.stats.peak = Math.max(this.stats.peak, this.visitors.size);
     logEvent("practice_join", { people: this.visitors.size, named: Boolean(asked?.trim()) });
 
     if (!this.timer) {
       this.startRound(Date.now());
       this.last = Date.now();
-      this.timer = setInterval(() => this.tick(), TICK_MS);
+      this.timer = setInterval(() => {
+        try {
+          this.tick();
+        } catch (err) {
+          this.failed("tick", err);
+        }
+      }, TICK_MS);
     } else if (this.sim) {
       // Joining mid-round: a duck in the huddle straight away.
       ensureDuck(this.sim, duck.id);
@@ -116,10 +177,12 @@ export class Demo extends DurableObject<Env> {
     arenaMove(this.sim, v.duck.id, msg.move);
   }
 
-  private leave(id: string) {
+  private leave(id: string, how: "leave" | "drop") {
     if (!this.visitors.delete(id)) return;
+    if (how === "drop") this.stats.drops++;
+    else this.stats.leaves++;
     if (this.sim) removeDuck(this.sim, id);
-    logEvent("practice_leave", { people: this.visitors.size });
+    logEvent("practice_leave", { people: this.visitors.size, how });
     if (this.visitors.size === 0) {
       // Nobody watching: stop until the next visitor.
       if (this.timer) clearInterval(this.timer);
@@ -164,6 +227,7 @@ export class Demo extends DurableObject<Env> {
   /** A new question: fresh arena, and computer ducks to make up the numbers. */
   private startRound(now: number) {
     this.round++;
+    this.stats.rounds++;
     this.question = (this.question + 1) % DEMO_QUESTIONS.length;
     this.phase = "open";
     this.endsAt = now + DEMO_OPEN_SEC * 1000;
