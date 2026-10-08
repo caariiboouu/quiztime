@@ -95,3 +95,17 @@ for big scenes).
   (`step`, `hold`, `emote`, `everyone`) for keyboard or network input.
 - `#/live/flock`: stress test with 16–64 ducks and live fps / draw-call
   stats. 32 ducks run at ~57 fps on an Intel UHD 620 laptop GPU.
+
+## Side-on (2D) stage
+
+For side-on games (platformers, races, King of the Hill), use
+`../sideview/SideStage.tsx` with `shared/platformer.ts` instead of the flock:
+ducks stand on platforms (shelves, blocks, the floor) seen almost face-on with
+an orthographic camera, so every level is the same size. Hold or tap ←/→ to
+walk (one tap = one step), ↑ to jump up a level (clears `JUMP_HEIGHT`), ↓ to
+drop through a platform (not a `solid` one), Space to quack; ducks bump each
+other and can be flown back to a spot (`sideFlyTo`). The physics is pure, so
+the Worker can run it for multiplayer like the arena. The Ceramic Duck Hours
+shelf view (`../duckboard/ShelfBoard.tsx`, `shelfLayout.ts`) is the worked
+example.
+

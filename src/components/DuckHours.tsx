@@ -11,6 +11,18 @@ import { lookFor, lookForIndex } from "../live/mascot/variants";
 import { hasWebGL } from "../live/minigames/three/fallbackContext";
 
 const DuckBoardScene = lazy(() => import("../live/duckboard/DuckBoardScene"));
+const ShelfBoard = lazy(() => import("../live/duckboard/ShelfBoard"));
+
+/** Shelves (side-on, the default) or the garden (from above); remembered per device. */
+type BoardView = "shelves" | "garden";
+const VIEW_KEY = "quiztime.duckHours.view";
+function savedView(): BoardView {
+  try {
+    return localStorage.getItem(VIEW_KEY) === "garden" ? "garden" : "shelves";
+  } catch {
+    return "shelves";
+  }
+}
 
 export const DUCK_OVERRIDE_KEY = "quiztime.duckHours.override";
 
@@ -120,6 +132,15 @@ export function DuckHours({ onExit }: DuckHoursProps) {
   const chosen = entries.find((e) => e.id === selected);
   const chosenHolder = data.holders.find((h) => h.id === selected);
   const webgl = useMemo(() => hasWebGL(), []);
+  const [boardView, setBoardView] = useState<BoardView>(savedView);
+  const pickView = (v: BoardView) => {
+    setBoardView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      // fine: not remembered
+    }
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -152,10 +173,34 @@ export function DuckHours({ onExit }: DuckHoursProps) {
           </div>
         ) : webgl ? (
           <>
+            <div className="mb-3 flex justify-end">
+              <div className="inline-flex rounded-full bg-neutral-200 p-1 text-sm font-semibold" role="group" aria-label="View">
+                {(
+                  [
+                    ["shelves", "Shelves"],
+                    ["garden", "Garden"],
+                  ] as const
+                ).map(([v, label]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    aria-pressed={boardView === v}
+                    onClick={() => pickView(v)}
+                    className={`rounded-full px-3 py-1 ${boardView === v ? "bg-white shadow" : "text-neutral-600"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <Suspense
               fallback={<p className="py-24 text-center text-neutral-500">Gathering the ducks…</p>}
             >
-              <DuckBoardScene entries={entries} meId={meId} onSelect={setSelected} controls={!selected} />
+              {boardView === "shelves" ? (
+                <ShelfBoard entries={entries} meId={meId} onSelect={setSelected} controls={!selected} />
+              ) : (
+                <DuckBoardScene entries={entries} meId={meId} onSelect={setSelected} controls={!selected} />
+              )}
             </Suspense>
             {/* The same standings as text, for screen readers. */}
             <ol className="sr-only">

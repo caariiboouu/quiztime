@@ -43,7 +43,7 @@ const SX = 2.5;
 const SZ = 3.1;
 const ELEVATION = 60;
 /** Ducks hold one of these poses… */
-const POSES: MascotAnimation[] = ["idle", "dance", "celebrate", "quack", "flap", "waddle", "idle"];
+const POSES: MascotAnimation[] = ["idle", "dance", "quack", "flap", "waddle", "idle"];
 /** …and now and then do one of these. */
 const MOVES: MascotAnimation[] = ["dance", "celebrate", "quack", "flap", "waddle"];
 const TILE = ["#f6c945", "#cfd4da", "#d99a5b"];
