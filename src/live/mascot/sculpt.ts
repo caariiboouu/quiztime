@@ -488,6 +488,8 @@ export type RigOptions = {
   shadows?: boolean;
   /** The Ceramic Duck Hours leader: wears the gold crown instead of a hat. */
   crowned?: boolean;
+  /** Just the duck: no hat or neckpiece (the crown still shows if crowned). */
+  bare?: boolean;
 };
 
 /**
@@ -597,13 +599,13 @@ export function buildDuckRig(look: DuckLook = MASCOT_LOOK, opts: RigOptions = {}
   // --- neckpiece and hat
   const neck = attach(new Group(), neckBase, at.neckBase, new Vector3(0.55, 0.95, 0));
   neck.rotation.z = -0.12;
-  buildNeckpiece(look.neckpiece, neck, { mesh, sphere, m, seg });
+  if (!opts.bare) buildNeckpiece(look.neckpiece, neck, { mesh, sphere, m, seg });
   const hat = onHead(new Group(), 0.73, 1.6);
   hat.rotation.z = 0.12;
   hat.scale.setScalar(shape.head);
   if (opts.crowned) buildRoyalCrown(hat, { mesh, sphere, m, seg });
-  else buildHat(look.hat, hat, { mesh, sphere, m, seg });
-  if (breed.crest && look.hat === "none" && !opts.crowned) {
+  else if (!opts.bare) buildHat(look.hat, hat, { mesh, sphere, m, seg });
+  if (breed.crest && (look.hat === "none" || opts.bare) && !opts.crowned) {
     // A pom of feathers on the crown (hats sit where it would be).
     const crest = new Group();
     hat.add(crest);

@@ -127,6 +127,14 @@ hashed, and 5 wrong PINs in a row lock the account for 15 minutes. The host
 resets a forgotten PIN from "Forgotten PINs" under the room setup form (needs
 the host password); the next PIN that player types becomes their new one.
 
+Players can also claim their entry from the Ceramic Duck Hours page ("This
+is me"), change their PIN there (with the current one), or email the keeper a
+reset request (like name-change requests); the host resets it. Each person
+keeps one duck everywhere (`lookSeed` on the account, from their Duck Hours
+entry when they claimed one): the board shows it plain, the leader crowned,
+and in games they dress it up. Renaming someone in the standings renames
+their quiz name too.
+
 In the lobby players dress their duck: a hat and a neckpiece
 (`shared/outfit.ts`), saved on their account for every game. Breed and
 accessory colour still come from join order, so ducks stay easy to tell apart.

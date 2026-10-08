@@ -10,6 +10,7 @@
  *   GET  /api/accounts           everyone who has an account (names, no secrets)
  *   POST /api/accounts           claim a Duck Hours entry or add someone new (+ PIN)
  *   POST /api/accounts/:id/login sign in on this device with the PIN
+ *   POST /api/accounts/:id/pin   change your PIN (with the current one)
  *   POST /api/accounts/:id/reset host resets a forgotten PIN (needs HOST_PASSWORD)
  *   POST /api/show/load          the saved question set, answers and all (needs HOST_PASSWORD)
  *   POST /api/show/save          replace the saved question set (needs HOST_PASSWORD)
@@ -18,6 +19,7 @@
  *   POST /api/duck-hours/undo    put back the standings from before the last change
  */
 import type {
+  ChangePinRequest,
   CreateAccountRequest,
   CreateRoomRequest,
   CreateRoomResponse,
@@ -152,7 +154,10 @@ export default {
       }
       const problem = standingsError(body.data);
       if (problem) return json({ error: problem }, 400, origin);
-      return json(await standingsStub(env).save(body.data, Date.now()), 200, origin);
+      const saved = await standingsStub(env).save(body.data, Date.now());
+      // Renamed someone on the board: their quiz name follows.
+      await accountsStub(env).syncNames(body.data.holders);
+      return json(saved, 200, origin);
     }
 
     if ((url.pathname === "/api/show/load" || url.pathname === "/api/show/save") && request.method === "POST") {
@@ -179,8 +184,14 @@ export default {
         const res = await accounts.create(body);
         return "error" in res ? json({ error: res.error }, res.status, origin) : json(res, 201, origin);
       }
-      const a = url.pathname.match(/^\/api\/accounts\/([0-9a-f-]{36})\/(login|reset)$/);
+      const a = url.pathname.match(/^\/api\/accounts\/([0-9a-f-]{36})\/(login|reset|pin)$/);
       if (a && request.method === "POST") {
+        if (a[2] === "pin") {
+          const body = await readJson<ChangePinRequest>(request);
+          if (!body) return json({ error: "Invalid JSON" }, 400, origin);
+          const res = await accounts.changePin(a[1], String(body.pin ?? ""), String(body.newPin ?? ""));
+          return "error" in res ? json({ error: res.error }, res.status, origin) : json(res, 200, origin);
+        }
         if (a[2] === "login") {
           const body = await readJson<LoginRequest>(request);
           if (!body) return json({ error: "Invalid JSON" }, 400, origin);

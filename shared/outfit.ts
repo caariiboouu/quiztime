@@ -37,3 +37,17 @@ export function cleanOutfit(x: unknown): DuckOutfit | null {
     : null;
   return hat === null && neckpiece === null ? null : { hat, neckpiece };
 }
+
+/**
+ * Which duck someone is (breed, colour, proportions): a stable number from
+ * an id, so a person keeps the same duck in every game and on the Ceramic
+ * Duck Hours board. (FNV-1a, kept positive and under a million.)
+ */
+export function lookSeedFor(id: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0) % 1_000_000;
+}

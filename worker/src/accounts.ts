@@ -13,7 +13,7 @@
  * CPU to spare). A forgotten PIN is reset by the host.
  */
 import { DurableObject } from "cloudflare:workers";
-import { cleanOutfit, type DuckOutfit } from "../../shared/outfit";
+import { cleanOutfit, lookSeedFor, type DuckOutfit } from "../../shared/outfit";
 import {
   MAX_NAME_LENGTH,
   PIN_LOCK_MINUTES,
@@ -38,6 +38,7 @@ type Row = {
   pin_salt: string | null;
   pin_hash: string | null;
   outfit: string | null;
+  look_seed: number | null;
   failures: number;
   locked_until: number;
 };
@@ -61,7 +62,14 @@ function parseOutfit(raw: string | null): DuckOutfit | null {
 
 function toAccount(r: Row): Account {
   const outfit = parseOutfit(r.outfit);
-  return { id: r.id, name: r.name, holderId: r.holder_id, outfit, needsPin: !r.pin_hash };
+  return {
+    id: r.id,
+    name: r.name,
+    holderId: r.holder_id,
+    outfit,
+    lookSeed: r.look_seed ?? lookSeedFor(r.holder_id ?? r.id),
+    needsPin: !r.pin_hash,
+  };
 }
 
 export class Accounts extends DurableObject<Env> {
@@ -89,6 +97,12 @@ export class Accounts extends DurableObject<Env> {
         created_at INTEGER NOT NULL
       );
     `);
+    // Added later: which duck they are.
+    try {
+      this.sql.exec("ALTER TABLE accounts ADD COLUMN look_seed INTEGER");
+    } catch {
+      // already there
+    }
   }
 
   private row(id: string): Row | null {
@@ -143,12 +157,16 @@ export class Accounts extends DurableObject<Env> {
       return { error: "Someone already has that name", status: 409 };
     }
     const id = crypto.randomUUID();
+    // Claiming a Duck Hours entry keeps the duck it already shows on the
+    // board; someone new gets a duck of their own.
+    const lookSeed = holderId ? lookSeedFor(holderId) : lookSeedFor(id);
     this.sql.exec(
-      "INSERT INTO accounts (id, name, name_key, holder_id, created_at) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO accounts (id, name, name_key, holder_id, look_seed, created_at) VALUES (?, ?, ?, ?, ?, ?)",
       id,
       name,
       nameKey,
       holderId,
+      lookSeed,
       Date.now(),
     );
     await this.setPin(id, req.pin);
@@ -185,6 +203,30 @@ export class Accounts extends DurableObject<Env> {
     }
     this.sql.exec("UPDATE accounts SET failures = 0 WHERE id = ?", id);
     return this.newSession(r);
+  }
+
+  /** Change your PIN by typing the current one (same guessing limits as signing in). */
+  async changePin(id: string, pin: string, newPin: string): Promise<AccountResult<AccountSession>> {
+    if (!PIN_RE.test(String(newPin ?? ""))) return { error: "Your new PIN must be 4 digits", status: 400 };
+    const checked = await this.login(id, pin);
+    if ("error" in checked) return checked;
+    await this.setPin(id, newPin);
+    // Other devices stay signed in; this one gets a fresh session.
+    return this.newSession(this.row(id)!);
+  }
+
+  /** Renamed on the Duck Hours board: the player's name follows (unless someone else has it). */
+  async syncNames(holders: { id: string; initials: string }[]): Promise<void> {
+    for (const h of holders) {
+      const name = cleanAccountName(h.initials);
+      if (!name) continue;
+      const key = name.toLowerCase();
+      const clash = this.sql
+        .exec<{ id: string }>("SELECT id FROM accounts WHERE name_key = ? AND (holder_id IS NULL OR holder_id != ?)", key, h.id)
+        .toArray();
+      if (clash.length) continue;
+      this.sql.exec("UPDATE accounts SET name = ?, name_key = ? WHERE holder_id = ? AND name != ?", name, key, h.id, name);
+    }
   }
 
   /** The account for a signed-in device, or null if the token's no good. */

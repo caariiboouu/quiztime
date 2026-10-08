@@ -454,6 +454,8 @@ export type Account = {
   /** Their Ceramic Duck Hours entry, if they claimed one. */
   holderId: string | null;
   outfit: DuckOutfit | null;
+  /** Which duck they are, in every game and on the Duck Hours board (see lookSeedFor). */
+  lookSeed: number;
   /** The host reset their PIN: the next one they type becomes the new PIN. */
   needsPin?: boolean;
 };
@@ -464,6 +466,7 @@ export type AccountList = { accounts: Account[] };
 export type CreateAccountRequest = { name: string; holderId: string | null; pin: string };
 
 export type LoginRequest = { pin: string };
+export type ChangePinRequest = { pin: string; newPin: string };
 
 /** What a device keeps to stay signed in as an account. */
 export type AccountSession = { account: Account; token: string };

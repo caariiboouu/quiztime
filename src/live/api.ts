@@ -93,6 +93,13 @@ export const loginAccount = (id: string, pin: string) =>
     body: JSON.stringify({ pin }),
   });
 
+/** Change your PIN by typing the current one. */
+export const changeAccountPin = (id: string, pin: string, newPin: string) =>
+  call<AccountSession>(`/api/accounts/${encodeURIComponent(id)}/pin`, {
+    method: "POST",
+    body: JSON.stringify({ pin, newPin }),
+  });
+
 export const resetAccountPin = (id: string, password: string) =>
   call<{ ok: true }>(`/api/accounts/${encodeURIComponent(id)}/reset`, {
     method: "POST",

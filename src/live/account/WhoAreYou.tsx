@@ -219,7 +219,7 @@ function PeopleList({ people, onPick }: { people: Person[]; onPick: (p: Person) 
   );
 }
 
-function PinField({
+export function PinField({
   value,
   onChange,
   label,
@@ -248,7 +248,7 @@ function PinField({
   );
 }
 
-function PinStep({
+export function PinStep({
   title,
   prompt,
   confirm,

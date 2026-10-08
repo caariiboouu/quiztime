@@ -41,9 +41,9 @@ function setup() {
   camera.lookAt(0.34, 1.06, 0);
 }
 
-function draw(look: DuckLook, crowned: boolean): string {
+function draw(look: DuckLook, crowned: boolean, bare: boolean): string {
   setup();
-  const rig = buildDuckRig(look, { detail: "hero", shadows: false, crowned });
+  const rig = buildDuckRig(look, { detail: "hero", shadows: false, crowned, bare });
   applyPose(rig, poseAt("idle", 0));
   scene!.add(rig.root);
   rig.root.updateMatrixWorld(true);
@@ -54,12 +54,12 @@ function draw(look: DuckLook, crowned: boolean): string {
   return url;
 }
 
-/** A picture of this duck (cached; drawn one at a time). */
-export function duckPortrait(look: DuckLook, crowned: boolean): Promise<string> {
-  const key = `${JSON.stringify(look)}|${crowned}`;
+/** A picture of this duck (cached; drawn one at a time). `bare`: no hat or neckpiece. */
+export function duckPortrait(look: DuckLook, crowned: boolean, bare = false): Promise<string> {
+  const key = `${JSON.stringify(look)}|${crowned}|${bare}`;
   let url = cache.get(key);
   if (!url) {
-    url = queue.then(() => draw(look, crowned));
+    url = queue.then(() => draw(look, crowned, bare));
     queue = url.catch(() => undefined);
     cache.set(key, url);
   }

@@ -56,6 +56,8 @@ export type PlayerJoin = {
   duckHolderId: string | null;
   accountId?: string | null;
   outfit?: DuckOutfit | null;
+  /** Which duck they are (from their account); otherwise join order picks. */
+  lookIndex?: number;
 };
 
 export const MINIGAMES: readonly MinigameId[] = ["duck-stop", "pond-memory"];
@@ -454,7 +456,7 @@ export function addPlayer(
   const player: PlayerRecord = {
     id,
     name,
-    lookIndex: Object.keys(state.players).length,
+    lookIndex: req.lookIndex ?? Object.keys(state.players).length,
     teamId,
     duckHolderId,
     accountId: req.accountId ?? null,

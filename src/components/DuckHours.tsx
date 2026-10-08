@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavBar } from "./NavBar";
-import { useDuckData } from "../live/duckStore";
+import { useDuckData, useDuckLeader } from "../live/duckStore";
 import { liveSeconds } from "../../shared/duckStandings";
-
-
+import { lookSeedFor } from "../../shared/outfit";
+import type { Account } from "../../shared/protocol";
+import { listAccounts, liveConfigured } from "../live/api";
+import { ClaimPanel, PinOptions } from "../live/account/HolderAccount";
+import { recentlyRequested as askedToday, sendKeeperRequest } from "../live/account/keeperRequests";
+import { DuckAvatar } from "../live/mascot/DuckAvatar";
+import { lookForIndex } from "../live/mascot/variants";
 export const DUCK_OVERRIDE_KEY = "quiztime.duckHours.override";
-
-/** Where self-serve name-change requests are emailed for manual approval. */
-const REQUEST_EMAIL = "joel@cuthriell.com";
-const RENAME_GUARD_MS = 24 * 60 * 60 * 1000;
 
 const FRACTION_GLYPH: Record<number, string> = {
   1: "1×",
@@ -70,15 +71,7 @@ export function DuckHours({ onExit }: DuckHoursProps) {
 
   const selHolder = data.holders.find((h) => h.id === selId);
   const trimmedName = newName.replace(/\s+/g, " ").trim();
-  const recentlyRequested = (() => {
-    if (!selId) return false;
-    try {
-      const ts = Number(localStorage.getItem(`quiztime.duckRename.${selId}`));
-      return ts > 0 && now - ts < RENAME_GUARD_MS;
-    } catch {
-      return false;
-    }
-  })();
+  const recentlyRequested = !!selId && askedToday("Rename", selId, now);
   const canSend =
     !!selId &&
     trimmedName.length > 0 &&
@@ -87,24 +80,34 @@ export function DuckHours({ onExit }: DuckHoursProps) {
 
   const sendRequest = () => {
     if (!canSend) return;
-    const subject = "Ceramic Duck — name change request";
-    const body = [
+    sendKeeperRequest("Rename", selId, "Ceramic Duck — name change request", [
       "Please update my Ceramic Duck leaderboard entry.",
       "",
       `Current name: ${selHolder?.initials || "(blank)"}`,
       `Requested new name: ${trimmedName}`,
       `Entry ID: ${selId}`,
       `Requested at: ${new Date(now).toISOString()}`,
-    ].join("\n");
-    try {
-      localStorage.setItem(`quiztime.duckRename.${selId}`, String(now));
-    } catch {
-      // ignore
-    }
-    window.location.href = `mailto:${REQUEST_EMAIL}?subject=${encodeURIComponent(
-      subject,
-    )}&body=${encodeURIComponent(body)}`;
+    ]);
   };
+
+  // Who's claimed their entry (with a PIN), and each person's own duck.
+  const [accounts, setAccounts] = useState<Account[] | null>(null);
+  const loadAccounts = () =>
+    listAccounts().then(
+      (r) => setAccounts(r.accounts),
+      () => setAccounts(null),
+    );
+  useEffect(() => {
+    if (liveConfigured) void loadAccounts();
+  }, []);
+  const byHolder = useMemo(
+    () => new Map((accounts ?? []).filter((a) => a.holderId).map((a) => [a.holderId!, a])),
+    [accounts],
+  );
+  const leader = useDuckLeader();
+  // The entry whose claim / PIN panel is open.
+  const [open, setOpen] = useState<{ id: string; mode: "claim" | "pin" } | null>(null);
+  const [claimed, setClaimed] = useState<string | null>(null);
 
   return (
     <div className="flex h-full flex-col">
@@ -124,6 +127,12 @@ export function DuckHours({ onExit }: DuckHoursProps) {
           recent 30 days since standings last changed count toward accrual.
         </p>
 
+        {claimed && (
+          <p className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900" role="status">
+            🔒 {claimed} is yours. This device remembers you; on another device, pick yourself
+            and type your PIN when you join a live quiz.
+          </p>
+        )}
         {ranked.length === 0 ? (
           <div className="rounded-xl border border-dashed border-neutral-300 bg-white p-10 text-center text-neutral-500">
             No participants yet. Add some from the admin panel.
@@ -134,47 +143,104 @@ export function DuckHours({ onExit }: DuckHoursProps) {
               const isHolding = holder.rank === 1;
               const isRanked = holder.rank !== null;
               const total = liveSeconds(data, holder.id, now);
+              const account = byHolder.get(holder.id);
+              // Their own duck, plain (the leader wears the crown); the same
+              // duck they play as in the live quiz.
+              const look = lookForIndex(account?.lookSeed ?? lookSeedFor(holder.id));
+              const panel = open?.id === holder.id ? open.mode : null;
               return (
                 <li
                   key={holder.id}
-                  className={`flex items-center gap-4 rounded-xl border p-4 shadow-sm ${
+                  className={`rounded-xl border p-4 shadow-sm ${
                     isHolding
                       ? "border-amber-400 bg-amber-50"
                       : "border-neutral-200 bg-white"
                   }`}
                 >
-                  <span className="w-8 text-center text-lg font-semibold tabular-nums text-neutral-400">
-                    {index + 1}
-                  </span>
-                  <span className="flex min-w-0 flex-1 items-center gap-3">
-                    <span className="truncate text-xl font-bold tracking-wide text-neutral-900">
-                      {holder.initials || "—"}
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <span className="w-6 text-center text-lg font-semibold tabular-nums text-neutral-400 sm:w-8">
+                      {index + 1}
                     </span>
-                    {isHolding && <span className="text-xl">🦆</span>}
-                  </span>
-                  {isRanked ? (
+                    <DuckAvatar
+                      look={look}
+                      bare
+                      crowned={holder.id === leader}
+                      size={48}
+                      label={`${holder.initials || "This entry"}'s duck`}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="min-w-0 break-words text-xl font-bold leading-tight tracking-wide text-neutral-900">
+                          {holder.initials || "—"}
+                        </span>
+                        {isHolding && <span className="text-xl">🦆</span>}
+                      </span>
+                      {accounts && (
+                        <span className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs">
+                          {account ? (
+                            <>
+                              <span className="text-neutral-500">🔒 Claimed</span>
+                              <button
+                                type="button"
+                                onClick={() => setOpen(panel === "pin" ? null : { id: holder.id, mode: "pin" })}
+                                className="font-medium text-amber-700 underline"
+                              >
+                                PIN options
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setOpen(panel === "claim" ? null : { id: holder.id, mode: "claim" })}
+                              className="font-semibold text-amber-700 underline"
+                            >
+                              This is me: claim it
+                            </button>
+                          )}
+                        </span>
+                      )}
+                    </span>
+                    {isRanked ? (
+                      <span
+                        className={`hidden whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold sm:inline ${
+                          isHolding
+                            ? "bg-amber-200 text-amber-900"
+                            : "bg-neutral-100 text-neutral-600"
+                        }`}
+                      >
+                        {isHolding ? "holding" : ordinal(holder.rank!)} ·{" "}
+                        {fractionLabel(holder.rank)}
+                      </span>
+                    ) : (
+                      <span className="hidden whitespace-nowrap rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-400 sm:inline">
+                        benched
+                      </span>
+                    )}
                     <span
-                      className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        isHolding
-                          ? "bg-amber-200 text-amber-900"
-                          : "bg-neutral-100 text-neutral-600"
+                      className={`text-right text-lg font-semibold tabular-nums sm:w-36 sm:text-xl ${
+                        isHolding ? "text-amber-900" : "text-neutral-700"
                       }`}
                     >
-                      {isHolding ? "holding" : ordinal(holder.rank!)} ·{" "}
-                      {fractionLabel(holder.rank)}
+                      {formatDuration(total, isRanked && anyRunning)}
                     </span>
-                  ) : (
-                    <span className="whitespace-nowrap rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-400">
-                      benched
-                    </span>
+                  </div>
+                  {panel && (
+                    <div className="mt-4 border-t border-neutral-200 pt-4">
+                      {panel === "claim" ? (
+                        <ClaimPanel
+                          holder={holder}
+                          onCancel={() => setOpen(null)}
+                          onDone={() => {
+                            setOpen(null);
+                            setClaimed(holder.initials);
+                            void loadAccounts();
+                          }}
+                        />
+                      ) : (
+                        account && <PinOptions holder={holder} account={account} onClose={() => setOpen(null)} />
+                      )}
+                    </div>
                   )}
-                  <span
-                    className={`w-36 text-right text-xl font-semibold tabular-nums ${
-                      isHolding ? "text-amber-900" : "text-neutral-700"
-                    }`}
-                  >
-                    {formatDuration(total, isRanked && anyRunning)}
-                  </span>
                 </li>
               );
             })}

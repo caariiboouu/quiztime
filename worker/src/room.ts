@@ -156,6 +156,7 @@ export class Room extends DurableObject<Env> {
           duckHolderId: account.holderId,
           accountId: account.id,
           outfit: account.outfit,
+          lookIndex: account.lookSeed,
         },
         crypto.randomUUID(),
         randomToken(),

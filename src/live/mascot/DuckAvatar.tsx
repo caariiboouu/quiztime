@@ -9,11 +9,14 @@ import type { DuckLook } from "./variants";
 export function DuckAvatar({
   look,
   crowned = false,
+  bare = false,
   size = 40,
   label,
 }: {
   look: DuckLook;
   crowned?: boolean;
+  /** Just the duck: no hat or neckpiece. */
+  bare?: boolean;
   size?: number;
   /** For screen readers, e.g. "Ann's duck". */
   label?: string;
@@ -23,17 +26,17 @@ export function DuckAvatar({
     if (!hasWebGL()) return;
     let live = true;
     import("./portrait")
-      .then((m) => m.duckPortrait(look, crowned))
+      .then((m) => m.duckPortrait(look, crowned, bare))
       .then((url) => live && setSrc(url))
       .catch(() => undefined);
     return () => {
       live = false;
     };
-  }, [look, crowned]);
+  }, [look, crowned, bare]);
   return (
     <span
       className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-100"
-      style={{ width: size, height: size, borderColor: look.accent, borderWidth: 2 }}
+      style={{ width: size, height: size, borderColor: bare ? "#d4d4d4" : look.accent, borderWidth: 2 }}
       role={label ? "img" : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
