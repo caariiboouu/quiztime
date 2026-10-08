@@ -1,0 +1,236 @@
+{
+  "title": "Live Sampler: Benefits Battleground",
+  "segments": [
+    {
+      "kind": "question",
+      "question": {
+        "type": "poll",
+        "id": "warmup-poll",
+        "prompt": "Warm-up: which survival skill would you most like to have?",
+        "options": [
+          {
+            "id": "fire",
+            "text": "Starting a fire"
+          },
+          {
+            "id": "shelter",
+            "text": "Building a shelter"
+          },
+          {
+            "id": "fish",
+            "text": "Catching fish"
+          },
+          {
+            "id": "nav",
+            "text": "Navigating by the stars"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "question",
+      "question": {
+        "type": "choice",
+        "id": "rule-of-three",
+        "prompt": "The survival 'Rule of 3' says you can last about 3 ___ without shelter in harsh cold.",
+        "options": [
+          {
+            "id": "a",
+            "text": "Minutes"
+          },
+          {
+            "id": "b",
+            "text": "Hours"
+          },
+          {
+            "id": "c",
+            "text": "Days"
+          },
+          {
+            "id": "d",
+            "text": "Weeks"
+          }
+        ],
+        "correctId": "b",
+        "points": 100,
+        "timeLimitSec": 20,
+        "factoid": "3 minutes without air, 3 hours without shelter, 3 days without water, 3 weeks without food."
+      }
+    },
+    {
+      "kind": "question",
+      "question": {
+        "type": "choice",
+        "id": "duck-raft",
+        "prompt": "True or false: a group of ducks floating on the water can be called a 'raft'.",
+        "options": [
+          {
+            "id": "t",
+            "text": "True"
+          },
+          {
+            "id": "f",
+            "text": "False"
+          }
+        ],
+        "correctId": "t",
+        "points": 100,
+        "timeLimitSec": 15,
+        "factoid": "Rafts on the water, a 'team' or 'skein' in flight, and a 'brace' for a pair."
+      }
+    },
+    {
+      "kind": "minigame",
+      "id": "mg-duck-stop",
+      "game": "duck-stop",
+      "points": 150,
+      "durationSec": 30
+    },
+    {
+      "kind": "question",
+      "question": {
+        "type": "numeric",
+        "id": "auckland-months",
+        "prompt": "Thomas Musgrave's crew was shipwrecked on Auckland Island in 1864. How many months before they were rescued?",
+        "answer": 20,
+        "unit": "months",
+        "points": 150,
+        "timeLimitSec": 30,
+        "factoid": "Roughly 20 months, from January 1864 into mid-1865. They built a stone-chimneyed cabin and made clothes from sealskin."
+      }
+    },
+    {
+      "kind": "question",
+      "question": {
+        "type": "written",
+        "id": "stranded-plan",
+        "prompt": "You're stranded somewhere cold with a knife, a tarp, and a lighter. What are your first three priorities, and why?",
+        "referenceAnswer": "Shelter first to stay out of wind and wet (using the tarp), then fire for warmth and signalling (using the lighter), then finding and purifying water. Stay dry, because wet clothing loses heat fast.",
+        "rubric": [
+          "names shelter or protection from the elements as an early priority",
+          "mentions making a fire",
+          "mentions finding or purifying water",
+          "explains why at least one priority matters"
+        ],
+        "points": 200
+      }
+    },
+    {
+      "kind": "lightning",
+      "id": "lightning-1",
+      "title": "Lightning round",
+      "timeLimitSec": 10,
+      "points": 50,
+      "speedBonus": 50,
+      "revealSec": 3,
+      "questions": [
+        {
+          "id": "lr-drake",
+          "prompt": "A male duck is called a…",
+          "options": [
+            {
+              "id": "a",
+              "text": "Drake"
+            },
+            {
+              "id": "b",
+              "text": "Cob"
+            },
+            {
+              "id": "c",
+              "text": "Tom"
+            },
+            {
+              "id": "d",
+              "text": "Buck"
+            }
+          ],
+          "correctId": "a"
+        },
+        {
+          "id": "lr-boil",
+          "prompt": "True or false: water boils at a lower temperature at high altitude.",
+          "options": [
+            {
+              "id": "t",
+              "text": "True"
+            },
+            {
+              "id": "f",
+              "text": "False"
+            }
+          ],
+          "correctId": "t"
+        },
+        {
+          "id": "lr-hypo",
+          "prompt": "Hypothermia starts when core body temperature drops below about…",
+          "options": [
+            {
+              "id": "a",
+              "text": "37 °C / 98.6 °F"
+            },
+            {
+              "id": "b",
+              "text": "35 °C / 95 °F"
+            },
+            {
+              "id": "c",
+              "text": "30 °C / 86 °F"
+            },
+            {
+              "id": "d",
+              "text": "25 °C / 77 °F"
+            }
+          ],
+          "correctId": "b"
+        },
+        {
+          "id": "lr-polaris",
+          "prompt": "True or false: Polaris, the North Star, sits almost directly above Earth's North Pole.",
+          "options": [
+            {
+              "id": "t",
+              "text": "True"
+            },
+            {
+              "id": "f",
+              "text": "False"
+            }
+          ],
+          "correctId": "t"
+        },
+        {
+          "id": "lr-cygnet",
+          "prompt": "A baby swan is called a…",
+          "options": [
+            {
+              "id": "a",
+              "text": "Duckling"
+            },
+            {
+              "id": "b",
+              "text": "Gosling"
+            },
+            {
+              "id": "c",
+              "text": "Cygnet"
+            },
+            {
+              "id": "d",
+              "text": "Poult"
+            }
+          ],
+          "correctId": "c"
+        }
+      ]
+    },
+    {
+      "kind": "minigame",
+      "id": "mg-pond-memory",
+      "game": "pond-memory",
+      "points": 150,
+      "durationSec": 45
+    }
+  ]
+}

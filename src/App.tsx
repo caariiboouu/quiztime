@@ -7,6 +7,8 @@ import { CarrotInABox } from "./components/games/CarrotInABox";
 import { DuckHours } from "./components/DuckHours";
 import { ComingSoon } from "./components/ComingSoon";
 import { AdminPanel } from "./components/admin/AdminPanel";
+import { LiveApp } from "./live/LiveApp";
+import { isLiveHash } from "./live/routes";
 import { GAMES } from "./data/games";
 import type { GameId } from "./types";
 import { usePersistentState } from "./hooks/usePersistentState";
@@ -46,6 +48,18 @@ function App() {
   if (DUCK_HASHES.has(hash)) {
     return (
       <DuckHours
+        onExit={() => {
+          window.location.hash = "";
+        }}
+      />
+    );
+  }
+
+  // The online quiz is played remotely, so it sits outside the unlock gate too.
+  if (isLiveHash(hash)) {
+    return (
+      <LiveApp
+        hash={hash}
         onExit={() => {
           window.location.hash = "";
         }}

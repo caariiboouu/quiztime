@@ -43,6 +43,11 @@ const id = buildId();
 export default defineConfig({
   plugins: [react(), versionManifest(id)],
   base: "/quiztime/",
+  build: {
+    // three.js lands in its own chunk (~250 kB gzipped) that only loads when
+    // a 3D minigame starts, so its size doesn't slow down the quiz itself.
+    chunkSizeWarningLimit: 1000,
+  },
   define: {
     __BUILD_ID__: JSON.stringify(id),
   },

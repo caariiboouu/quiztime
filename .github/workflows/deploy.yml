@@ -25,6 +25,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          # URL of the deployed live-quiz Worker (repo Settings → Variables → LIVE_API_URL).
+          VITE_LIVE_API_URL: ${{ vars.LIVE_API_URL }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -43,7 +43,19 @@ export function Hub({ onSelectGame, onOpenAdmin }: HubProps) {
           ))}
         </div>
       </main>
-      <footer className="px-6 py-4 text-right">
+      <footer className="flex items-center justify-between px-6 py-4">
+        <a
+          href="#/live/host"
+          className="text-xs font-medium text-neutral-400 hover:text-neutral-700"
+        >
+          Host a live online quiz
+        </a>
+        <a
+          href="#/live/arena"
+          className="text-xs font-medium text-neutral-400 hover:text-neutral-700"
+        >
+          Duck arena practice
+        </a>
         <button
           type="button"
           onClick={onOpenAdmin}

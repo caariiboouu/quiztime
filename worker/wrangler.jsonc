@@ -1,0 +1,29 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "quiztime-live",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "Room" },
+      { "name": "DEMO", "class_name": "Demo" },
+      { "name": "ACCOUNTS", "class_name": "Accounts" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Room"] },
+    { "tag": "v2", "new_sqlite_classes": ["Demo"] },
+    { "tag": "v3", "new_sqlite_classes": ["Accounts"] }
+  ],
+  "vars": {
+    // Official TypeSafe endpoint (https://docs.typesafe.ai/api).
+    "JEV_API_URL": "https://api.typesafe.ai/v1/systemone",
+    // Pinned so a new Jev release can't silently shift scoring; bump on purpose.
+    "JEV_MODEL": "jev-1.13.0",
+    "ALLOWED_ORIGINS": "https://caariiboouu.github.io,http://localhost:5173,http://127.0.0.1:5173"
+  }
+  // Secrets (not in this file):
+  //   npx wrangler secret put HOST_PASSWORD -c worker/wrangler.jsonc
+  //   npx wrangler secret put JEV_API_KEY   -c worker/wrangler.jsonc
+  // For local dev, put them in worker/.dev.vars (gitignored).
+}
