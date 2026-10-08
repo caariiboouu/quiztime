@@ -260,7 +260,8 @@ export function PinStep({
   /** Setting a new PIN: type it twice. */
   confirm?: boolean;
   onPin: (pin: string) => Promise<void>;
-  onBack: () => void;
+  /** "Not you? Pick someone else" (left out when there's nowhere to go back to). */
+  onBack?: () => void;
 }) {
   const [pin, setPin] = useState("");
   const [again, setAgain] = useState("");
@@ -301,9 +302,11 @@ export function PinStep({
       >
         {busy ? "Checking…" : "That's me"}
       </button>
-      <button type="button" onClick={onBack} className="w-full text-sm text-neutral-500 underline">
-        Not you? Pick someone else
-      </button>
+      {onBack && (
+        <button type="button" onClick={onBack} className="w-full text-sm text-neutral-500 underline">
+          Not you? Pick someone else
+        </button>
+      )}
     </form>
   );
 }

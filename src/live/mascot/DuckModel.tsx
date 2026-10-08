@@ -28,6 +28,10 @@ type DuckModelProps = Omit<ThreeElements["group"], "ref"> & {
    * head clear of a neighbour (see shared/flock.ts).
    */
   overlay?: () => Partial<Pose> | null;
+  /** While true, hold the animation's signature pose instead of moving (read every frame). */
+  hold?: () => boolean;
+  /** Just the duck: no hat or neckpiece. */
+  bare?: boolean;
 };
 
 const BLEND_SEC = 0.35;
@@ -39,12 +43,15 @@ export function DuckModel({
   shadows = true,
   crowned = false,
   overlay,
+  hold,
+  bare = false,
   ...group
 }: DuckModelProps) {
   const holder = useRef<Group>(null);
   const rig = useRef<DuckRig | null>(null);
-  const state = useRef<{ name: MascotAnimation | null; start: number; from: Pose; now: Pose }>({
+  const state = useRef<{ name: MascotAnimation | null; held: boolean; start: number; from: Pose; now: Pose }>({
     name: null,
+    held: false,
     start: 0,
     from: REST,
     now: REST,
@@ -56,7 +63,7 @@ export function DuckModel({
   useLayoutEffect(() => {
     const parent = holder.current;
     if (!parent) return;
-    const built = buildDuckRig(look, { detail, shadows, crowned });
+    const built = buildDuckRig(look, { detail, shadows, crowned, bare });
     parent.add(built.root);
     rig.current = built;
     return () => {
@@ -64,7 +71,7 @@ export function DuckModel({
       built.dispose();
       rig.current = null;
     };
-  }, [look, detail, shadows, crowned]);
+  }, [look, detail, shadows, crowned, bare]);
 
   useFrame(({ clock }) => {
     const r = rig.current;
@@ -72,12 +79,14 @@ export function DuckModel({
     const s = state.current;
     const now = clock.elapsedTime;
     const anim = typeof animation === "function" ? animation() : animation;
-    if (s.name !== anim) {
+    const held = hold?.() ?? false;
+    if (s.name !== anim || s.held !== held) {
       s.from = s.now;
       s.name = anim;
+      s.held = held;
       s.start = now;
     }
-    const target = poseAt(anim, still ? STILL_TIME[anim] : now - s.start);
+    const target = poseAt(anim, still || held ? STILL_TIME[anim] : now - s.start);
     const w = still ? 1 : (now - s.start) / BLEND_SEC;
     const p = w >= 1 ? target : blendPose(s.from, target, w);
     s.now = p;

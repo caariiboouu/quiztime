@@ -12,6 +12,7 @@ import type {
   RoomInfo,
 } from "../../shared/protocol";
 import type { DuckHoursData } from "../types";
+import type { DuckOutfit } from "../../shared/outfit";
 
 /**
  * Where the live-quiz Worker lives. Set VITE_LIVE_API_URL at build time
@@ -91,6 +92,13 @@ export const loginAccount = (id: string, pin: string) =>
   call<AccountSession>(`/api/accounts/${encodeURIComponent(id)}/login`, {
     method: "POST",
     body: JSON.stringify({ pin }),
+  });
+
+/** Dress your duck outside a game (this device must be signed in as them). */
+export const setAccountOutfit = (id: string, token: string, outfit: DuckOutfit) =>
+  call<Account>(`/api/accounts/${encodeURIComponent(id)}/outfit`, {
+    method: "POST",
+    body: JSON.stringify({ token, outfit }),
   });
 
 /** Change your PIN by typing the current one. */

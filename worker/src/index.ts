@@ -11,6 +11,7 @@
  *   POST /api/accounts           claim a Duck Hours entry or add someone new (+ PIN)
  *   POST /api/accounts/:id/login sign in on this device with the PIN
  *   POST /api/accounts/:id/pin   change your PIN (with the current one)
+ *   POST /api/accounts/:id/outfit dress your duck (with this device's sign-in)
  *   POST /api/accounts/:id/reset host resets a forgotten PIN (needs HOST_PASSWORD)
  *   POST /api/show/load          the saved question set, answers and all (needs HOST_PASSWORD)
  *   POST /api/show/save          replace the saved question set (needs HOST_PASSWORD)
@@ -34,6 +35,7 @@ import { Accounts, accountsStub } from "./accounts";
 import { Library, libraryStub } from "./library";
 import { Standings, standingsStub } from "./standings";
 import { standingsError } from "../../shared/duckStandings";
+import { cleanOutfit } from "../../shared/outfit";
 import type { DuckHoursData } from "../../src/types";
 import { validateSettings, validateShow } from "./engine";
 import { Demo } from "./demo";
@@ -184,8 +186,17 @@ export default {
         const res = await accounts.create(body);
         return "error" in res ? json({ error: res.error }, res.status, origin) : json(res, 201, origin);
       }
-      const a = url.pathname.match(/^\/api\/accounts\/([0-9a-f-]{36})\/(login|reset|pin)$/);
+      const a = url.pathname.match(/^\/api\/accounts\/([0-9a-f-]{36})\/(login|reset|pin|outfit)$/);
       if (a && request.method === "POST") {
+        if (a[2] === "outfit") {
+          // Dress your duck outside a game: needs this device's sign-in.
+          const body = await readJson<{ token: string; outfit: unknown }>(request);
+          if (!body) return json({ error: "Invalid JSON" }, 400, origin);
+          const account = await accounts.verify(a[1], String(body.token ?? ""));
+          if (!account) return json({ error: "Please sign in again with your PIN." }, 401, origin);
+          await accounts.setOutfit(a[1], cleanOutfit(body.outfit));
+          return json({ ...account, outfit: cleanOutfit(body.outfit) }, 200, origin);
+        }
         if (a[2] === "pin") {
           const body = await readJson<ChangePinRequest>(request);
           if (!body) return json({ error: "Invalid JSON" }, 400, origin);
