@@ -58,6 +58,23 @@ export function angleBetween(a: number, b: number): number {
   return Math.min(d, TAU - d);
 }
 
+/**
+ * The waiting room: an open pond-side patch with no answers, where everyone
+ * who's joined can waddle about and get used to the controls before the
+ * game starts. Fixed size, so server and clients agree however many join.
+ */
+export const LOBBY_RADIUS = 7;
+export function lobbyLayout(): ArenaLayout {
+  return {
+    options: 0,
+    spawn: 2.6,
+    neutral: LOBBY_RADIUS,
+    radius: LOBBY_RADIUS,
+    zones: [],
+    bounds: { halfWidth: LOBBY_RADIUS, halfDepth: LOBBY_RADIUS },
+  };
+}
+
 /** Nose to tail, roughly, at the size ducks are drawn. */
 export const DUCK_LENGTH = 1.3;
 /** Every answer is at least this many duck lengths' waddle from the huddle. */

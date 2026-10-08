@@ -182,7 +182,7 @@ export function ArenaControls({
       >
         <div className="pointer-events-auto">{dpad}</div>
         <div className={`pointer-events-auto flex flex-col gap-1.5 ${swapped ? "items-start" : "items-end"}`}>
-          <div className={`grid gap-1.5 ${options > 4 ? "grid-cols-3" : "grid-cols-2"}`}>
+          <div className={`grid gap-1.5 ${options > 4 ? "grid-cols-3" : "grid-cols-2"} ${options ? "" : "hidden"}`}>
             {layout.zones.map((z) => (
               <button
                 key={z.index}
@@ -219,8 +219,8 @@ export function ArenaControls({
       <div className="flex flex-col items-center gap-2">
         {quack}
         <p className="max-w-[12rem] text-center text-xs text-neutral-500">
-          Hold a direction to walk, tap for a step. Or press 1–{options} to waddle straight to an
-          answer.
+          Hold a direction to walk, tap for a step.
+          {options > 0 && ` Or press 1–${options} to waddle straight to an answer.`}
         </p>
         <SoundToggle />
       </div>

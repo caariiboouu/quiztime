@@ -55,11 +55,13 @@ const SHOW: Show = {
   ],
 };
 
+// Most tests here are about tap-to-answer; the arena has its own tests below.
 const SETTINGS: RoomSettings = {
   teamMode: false,
   teams: [],
   choiceScoring: "accuracy",
   speedBonusMax: 50,
+  arena: false,
 };
 
 function setup(): { room: RoomState; t0: number } {
@@ -191,7 +193,7 @@ describe("written question", () => {
 
   it("has no deadline, stays open when everyone answers, and has no speed bonus", () => {
     const { room, t0 } = toWritten();
-    expect(room.run?.closesAt).toBeNull();
+    expect(room.run?.closesAt).toBeNull(); // no clock running yet
     answer(room, "p1", "w1", { type: "written", text: "Because reasons" }, t0 + 1);
     answer(room, "p2", "w1", { type: "written", text: "dunno" }, t0 + 999_999);
     expect(room.run?.stage).toBe("open");
@@ -608,9 +610,27 @@ describe("answer arena", () => {
     const room = createRoom("ABCD", "k", { show: ARENA, settings: SETTINGS }, t0);
     addPlayer(room, { name: "Ann", teamId: null, duckHolderId: null }, "p1", "t1", t0);
     addPlayer(room, { name: "Bob", teamId: null, duckHolderId: null }, "p2", "t2", t0);
-    host(room, { t: "advance" }, t0);
+    host(room, { t: "advance" }, t0); // the question, read out
+    host(room, { t: "advance" }, t0); // the answers: into the arena
     return { room, t0 };
   };
+
+  it("starts with just the question for the host to read out, then opens the arena", () => {
+    const t0 = 1_000_000;
+    const room = createRoom("ABCD", "k", { show: ARENA, settings: SETTINGS }, t0);
+    addPlayer(room, { name: "Ann", teamId: null, duckHolderId: null }, "p1", "t1", t0);
+    host(room, { t: "advance" }, t0);
+    expect(room.run?.stage).toBe("reading");
+    expect(openArena(room)).toBeNull(); // no ducks moving yet
+    expect(room.run?.closesAt).toBeNull(); // no clock running yet
+    // Someone joins while it's being read out: the arena is laid out for them too.
+    addPlayer(room, { name: "Bob", teamId: null, duckHolderId: null }, "p2", "t2", t0 + 5000);
+    host(room, { t: "advance" }, t0 + 9000);
+    expect(room.run?.stage).toBe("open");
+    expect(room.run?.answersOpenAt).toBe(t0 + 9000);
+    expect(room.run?.closesAt).toBe(t0 + 9000 + 20_000);
+    expect(openArena(room)).toMatchObject({ segmentId: "a1", players: 2 });
+  });
 
   it("lays out for everyone and tells players it's an arena", () => {
     const { room, t0 } = start();
@@ -661,3 +681,32 @@ describe("answer arena", () => {
     expect(openArena(room)).toBeNull();
   });
 });
+
+describe("arena by default", () => {
+  const show: Show = {
+    title: "Defaults",
+    segments: [
+      { kind: "question", question: { type: "choice", id: "c1", prompt: "?", options: [{ id: "a", text: "A" }, { id: "b", text: "B" }], correctId: "a", points: 100 } },
+      { kind: "question", question: { type: "poll", id: "p1", prompt: "?", options: [{ id: "a", text: "A" }, { id: "b", text: "B" }] } },
+      { kind: "question", question: { type: "choice", id: "c2", prompt: "?", options: [{ id: "a", text: "A" }, { id: "b", text: "B" }], correctId: "a", points: 100, arena: false } },
+      { kind: "question", question: { type: "numeric", id: "n1", prompt: "?", answer: 3, points: 100 } },
+    ],
+  } as Show;
+  const arenaFlags = (room: RoomState) =>
+    room.segments.map((s) => (s.kind === "question" && "arena" in s.question ? s.question.arena : "n/a"));
+
+  it("plays multiple-choice questions and polls in the arena unless a question opts out", () => {
+    const room = createRoom("ABCD", "k", { show, settings: { ...SETTINGS, arena: undefined } }, 0);
+    expect(arenaFlags(room)).toEqual([true, true, false, "n/a"]);
+  });
+
+  it("the host can turn the arena off for the whole game", () => {
+    const room = createRoom("ABCD", "k", { show, settings: { ...SETTINGS, arena: false } }, 0);
+    expect(arenaFlags(room)).toEqual([false, false, false, "n/a"]);
+  });
+
+  it("refuses a non-boolean arena setting", () => {
+    expect(validateSettings({ ...SETTINGS, arena: "yes" })).toMatch(/arena/);
+  });
+});
+

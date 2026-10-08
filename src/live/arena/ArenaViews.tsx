@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { arenaLayout } from "../../../shared/arena";
+import { arenaLayout, lobbyLayout } from "../../../shared/arena";
 import type { HostView, PlayerView, PublicPlayer, PublicSegment } from "../../../shared/protocol";
 import { duckHoursLeader } from "../mascot/duckChampion";
 import { lookFor } from "../mascot/variants";
@@ -245,3 +245,65 @@ export function AnswerList({
     </ul>
   );
 }
+
+/**
+ * The waiting room for a player: an open patch where everyone who's joined
+ * waddles about, bumps and quacks, getting used to the controls before the
+ * first question. The camera follows your duck (or shows the whole patch).
+ */
+export function PlayerLobby({
+  view,
+  feed,
+  onMove,
+}: {
+  view: PlayerView;
+  feed: { current: ArenaFeed };
+  onMove: (m: ArenaMove) => void;
+}) {
+  const layout = useMemo(() => lobbyLayout(), []);
+  const members = useMembers(view.players);
+  const source = useMemo(() => networkSource(feed), [feed]);
+  const [overview, setOverview] = useState(false);
+  const touch = useTouchScreen();
+  return (
+    <div className="space-y-3">
+      <ArenaView
+        layout={layout}
+        options={[]}
+        members={members}
+        source={source}
+        youId={view.me.id}
+        reveal={null}
+        overview={overview}
+        onToggle={() => setOverview((v) => !v)}
+        current={null}
+        onMove={onMove}
+      />
+      {!touch && <ArenaControls onMove={onMove} layout={layout} />}
+    </div>
+  );
+}
+
+/** The waiting room on the presenter's screen: everyone's ducks milling about. */
+export function HostLobbyArena({
+  players,
+  feed,
+}: {
+  players: PublicPlayer[];
+  feed: { current: ArenaFeed };
+}) {
+  const layout = useMemo(() => lobbyLayout(), []);
+  const members = useMembers(players);
+  const source = useMemo(() => networkSource(feed), [feed]);
+  return (
+    <ArenaPanel
+      layout={layout}
+      options={[]}
+      members={members}
+      source={source}
+      reveal={null}
+      className="mx-auto aspect-[16/10] max-w-3xl"
+    />
+  );
+}
+

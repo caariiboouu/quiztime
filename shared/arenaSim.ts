@@ -3,7 +3,7 @@
  * standing in. Shared by the Worker (authoritative multiplayer) and the
  * browser (local demo), so both play by exactly the same rules.
  */
-import { arenaLayout, spawnPoint, zoneAt, zoneTarget, type ArenaLayout } from "./arena";
+import { arenaLayout, lobbyLayout, spawnPoint, zoneAt, zoneTarget, type ArenaLayout } from "./arena";
 import {
   emote,
   holdWalker,
@@ -53,8 +53,17 @@ export type ArenaSim = {
 };
 
 export function createArenaSim(options: number, playerIds: string[], expected = playerIds.length): ArenaSim {
+  return simFor(arenaLayout(options, expected), playerIds, expected);
+}
+
+/** The lobby: everyone waddling about an open patch, no answers to stand on. */
+export function createLobbySim(playerIds: string[]): ArenaSim {
+  return simFor(lobbyLayout(), playerIds, Math.max(30, playerIds.length));
+}
+
+function simFor(layout: ArenaLayout, playerIds: string[], expected: number): ArenaSim {
   const sim: ArenaSim = {
-    layout: arenaLayout(options, expected),
+    layout,
     walkers: new Map(),
     zones: new Map(),
     spawned: 0,

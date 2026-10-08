@@ -219,6 +219,20 @@ function lightningError(r: LightningRound, where: string, ids: Set<string>): str
 }
 
 /** Flatten lightning rounds into speed-scored choice questions. */
+/**
+ * Multiple-choice questions and polls are played in the answer arena unless
+ * the question says otherwise (or the host turned the arena off). Lightning
+ * rounds stay tap-to-answer: they're too quick for walking.
+ */
+export function withArenaDefault(segments: Segment[], arena: boolean): Segment[] {
+  return segments.map((seg) => {
+    if (seg.kind !== "question" || seg.round) return seg;
+    const q = seg.question;
+    if ((q.type !== "choice" && q.type !== "poll") || q.arena !== undefined) return seg;
+    return { ...seg, question: { ...q, arena } };
+  });
+}
+
 export function expandShow(show: Show): Segment[] {
   return show.segments.flatMap((seg: ShowSegment): Segment[] => {
     if (seg.kind !== "lightning") return [seg];
@@ -294,6 +308,7 @@ export function validateSettings(settings: unknown): string | null {
   if (typeof s.teamMode !== "boolean") return "teamMode must be true or false";
   if (!SCORING_MODES.includes(s.choiceScoring)) return 'choiceScoring must be "accuracy" or "speed"';
   if (!isNum(s.speedBonusMax, 0, 10000)) return "speedBonusMax must be 0–10000";
+  if (s.arena !== undefined && typeof s.arena !== "boolean") return "arena must be true or false";
   if (!Array.isArray(s.teams) || s.teams.length > 8) return "Up to 8 teams";
   if (s.teamMode && s.teams.length < 2) return "Team mode needs at least 2 teams";
   const ids = new Set<string>();
@@ -325,7 +340,7 @@ export function createRoom(
     createdAt: now,
     title: req.show.title,
     settings: req.settings,
-    segments: expandShow(req.show),
+    segments: withArenaDefault(expandShow(req.show), req.settings.arena !== false),
     players: {},
     phase: "lobby",
     cursor: -1,
@@ -523,12 +538,15 @@ function openSegment(state: RoomState, index: number, now: number, seed: number)
   const answersOpenAt = now + intro;
   state.phase = "segment";
   state.cursor = index;
+  // Arena questions start with just the question up, for the host to read
+  // out; answers (and the clock) come when they press next.
+  const reading = isArena(seg);
   state.run = {
     index,
-    stage: "open",
+    stage: reading ? "reading" : "open",
     openedAt: now,
     answersOpenAt,
-    closesAt: closesAtFor(seg, answersOpenAt),
+    closesAt: reading ? null : closesAtFor(seg, answersOpenAt),
     advanceAt: null,
     arena: isArena(seg)
       ? { players: Object.values(state.players).filter((p) => !p.kicked).length }
@@ -539,6 +557,17 @@ function openSegment(state: RoomState, index: number, now: number, seed: number)
     finalPoints: {},
     reveal: null,
   };
+}
+
+/** After the read-out: show the answers, start the clock, lay out the arena for who's here now. */
+function openAnswers(state: RoomState, now: number) {
+  const run = state.run;
+  const seg = currentSegment(state);
+  if (!run || !seg || run.stage !== "reading") return;
+  run.stage = "open";
+  run.answersOpenAt = now;
+  run.closesAt = closesAtFor(seg, now);
+  if (run.arena) run.arena.players = Object.values(state.players).filter((p) => !p.kicked).length;
 }
 
 function openNextOrEnd(state: RoomState, now: number, seed: number) {
@@ -761,6 +790,9 @@ export function hostAction(
       }
       const run = state.run!;
       switch (run.stage) {
+        case "reading":
+          openAnswers(state, ctx.now);
+          return {};
         case "open":
           return closeSegment(state, ctx.judgeAvailable, ctx.now);
         case "closed":

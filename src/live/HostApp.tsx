@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo, useState } from "react";
+import { useState } from "react";
 import sampleShow from "../data/liveSampleShow.json";
 import { proposeDuckBonuses } from "../../shared/duckBonus";
 import type {
@@ -32,17 +32,11 @@ import {
 } from "./components";
 import { useControls } from "./controls";
 import { Mascot } from "./mascot/Mascot";
-import { lookFor } from "./mascot/variants";
 import { PinResets } from "./account/PinResets";
-import type { DuckOutfit } from "../../shared/outfit";
-import { duckHoursLeader } from "./mascot/duckChampion";
 import { hasWebGL } from "./minigames/three/fallbackContext";
-import type { FlockMember } from "./flock/FlockScene";
 import { MINIGAMES } from "./minigames";
 import { useRoom, useServerNow, type ArenaFeed } from "./useRoom";
-import { HostArena } from "./arena/ArenaViews";
-
-const FlockScene = lazy(() => import("./flock/FlockScene"));
+import { HostArena, HostLobbyArena } from "./arena/ArenaViews";
 
 const DEFAULT_TEAMS: Team[] = [
   { id: "mallards", name: "Mallards", color: "#16a34a" },
@@ -94,6 +88,7 @@ function HostSetup({
   const [teams, setTeams] = useState<Team[]>(DEFAULT_TEAMS);
   const [choiceScoring, setChoiceScoring] = useState<ScoringMode>("accuracy");
   const [speedBonusMax, setSpeedBonusMax] = useState(50);
+  const [arena, setArena] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -120,6 +115,7 @@ function HostSetup({
       teams: teamMode ? teams : [],
       choiceScoring,
       speedBonusMax,
+      arena,
     };
     try {
       const res = await createRoom({ password, show, settings });
@@ -181,6 +177,28 @@ function HostSetup({
           <p className="text-xs text-neutral-500">
             Keep real shows out of the public repo: everything in the site bundle (including the
             sample) is readable by players, answers included. Load them from a file at game time.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Answer arena</h2>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={arena}
+              onChange={(e) => setArena(e.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              <strong>Walk to answer</strong>: multiple-choice questions and polls are played in
+              the arena. Each one starts with just the question on screen for you to read out;
+              press <em>Show the answers</em> to open the arena. Players walk their ducks onto an
+              answer before time runs out.
+            </span>
+          </label>
+          <p className="text-xs text-neutral-500">
+            A question in the show file can opt out with <code>"arena": false</code>. Lightning
+            rounds are always tap-to-answer, and number and written questions are typed.
           </p>
         </section>
 
@@ -529,6 +547,8 @@ function nextAction(view: HostView | null): string | null {
       return isLast ? "Finish" : "Next";
     case "segment":
       switch (seg?.stage) {
+        case "reading":
+          return "Show the answers";
         case "open":
           return seg.kind === "minigame" ? "End round" : "Lock answers";
         case "closed":
@@ -565,7 +585,7 @@ function HostStage({
   if (view.phase === "lobby") {
     return (
       <div className="space-y-8 text-center">
-        <LobbyFlock players={view.players} />
+        <LobbyArea players={view.players} feed={feed} />
         <div>
           <p className="text-lg text-neutral-600">Join at</p>
           <p className="break-all text-2xl font-semibold text-neutral-900">{link}</p>
@@ -668,6 +688,19 @@ function HostQuestion({
 
   if (seg.stage === "open" && now < seg.answersOpenAt && seg.round) {
     return <GetReady now={now} until={seg.answersOpenAt} title={seg.round.title} />;
+  }
+
+  // Just the question, big, for the host to read out. Next opens the arena.
+  if (seg.stage === "reading") {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-8 text-center">
+        <SegmentBadges seg={seg} />
+        <h2 className="max-w-4xl text-4xl font-bold leading-snug sm:text-6xl">{q.prompt}</h2>
+        <p className="text-lg text-neutral-500">
+          Read it out, then press <strong>Show the answers</strong> to open the arena.
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -1003,31 +1036,11 @@ function DuckBonusPanel({ view }: { view: HostView }) {
 }
 
 /**
- * The lobby fills with everyone's ducks as they join: each waddles in from
- * the front and mills about with a name tag. Before anyone joins (or without
- * WebGL), the mascot holds the stage.
+ * The lobby fills with everyone's ducks as they join, waddling about the
+ * waiting-room patch as players try out the controls on their phones.
+ * Before anyone's connected (or without WebGL), the mascot holds the stage.
  */
-function LobbyFlock({ players }: { players: HostView["players"] }) {
-  // Only rebuild when someone joins or leaves, not on every state message.
-  const key = JSON.stringify(players.map((p) => [p.id, p.lookIndex, p.name, p.duckHolderId, p.outfit]));
-  const members: FlockMember[] = useMemo(() => {
-    const leader = duckHoursLeader();
-    type Row = [string, number, string, string | null, DuckOutfit | null];
-    return (JSON.parse(key) as Row[]).map(([id, look, name, duck, outfit]) => ({
-      id,
-      name,
-      look: lookFor(look, outfit),
-      crowned: duck !== null && duck === leader,
-    }));
-  }, [key]);
-  if (members.length === 0 || !hasWebGL()) return <Mascot animation="dance" size={220} />;
-  return (
-    <Suspense fallback={<Mascot animation="dance" size={220} />}>
-      <FlockScene
-        members={members}
-        className="mx-auto h-72 max-w-4xl sm:h-96"
-        description={`${members.length} player ducks waiting in the lobby.`}
-      />
-    </Suspense>
-  );
+function LobbyArea({ players, feed }: { players: HostView["players"]; feed: { current: ArenaFeed } }) {
+  if (!players.some((p) => p.connected) || !hasWebGL()) return <Mascot animation="dance" size={220} />;
+  return <HostLobbyArena players={players} feed={feed} />;
 }

@@ -172,6 +172,11 @@ export type RoomSettings = {
   choiceScoring: ScoringMode;
   /** Default max speed bonus for speed-scored choice questions. */
   speedBonusMax: number;
+  /**
+   * Play multiple-choice questions and polls in the answer arena unless a
+   * question says otherwise (default: yes). Lightning rounds stay tap-to-answer.
+   */
+  arena?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -185,7 +190,11 @@ export type RoomSettings = {
  *  review    – (written) host is checking Jev's suggested points
  *  revealed  – results shown and points awarded
  */
-export type SegmentStage = "open" | "closed" | "judging" | "review" | "revealed";
+/**
+ * "reading": arena questions start with just the question on screen for the
+ * host to read out; their next press opens the arena with the answers.
+ */
+export type SegmentStage = "reading" | "open" | "closed" | "judging" | "review" | "revealed";
 
 export type RoomPhase = "lobby" | "segment" | "leaderboard" | "ended";
 
@@ -462,6 +471,8 @@ export type RoomInfo = {
 };
 
 export const MAX_NAME_LENGTH = 32;
+/** The arena feed id for the lobby's waddle-about area. */
+export const LOBBY_FEED = "lobby";
 /** Players see a 3-2-1 before a minigame starts. */
 export const MINIGAME_COUNTDOWN_SEC = 3;
 /** "Get ready" countdown before the first lightning-round question. */

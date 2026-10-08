@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   MAX_WRITTEN_LENGTH,
   MINIGAME_COUNTDOWN_SEC,
+  LOBBY_FEED,
   type AccountSession,
   type AnswerValue,
   type PlayerView,
@@ -39,7 +40,7 @@ import { MinigamePlayer } from "./minigames/MinigamePlayer";
 import { hasWebGL } from "./minigames/three/fallbackContext";
 import { useGraphicsPref } from "./minigames/useGraphicsPref";
 import { useRoom, useServerNow, type ArenaFeed, type RoomStatus } from "./useRoom";
-import { PlayerArena } from "./arena/ArenaViews";
+import { PlayerArena, PlayerLobby } from "./arena/ArenaViews";
 import { OutfitPicker } from "./account/OutfitPicker";
 import { WhoAreYou } from "./account/WhoAreYou";
 
@@ -406,7 +407,8 @@ function playerMood(view: PlayerView): MascotAnimation | null {
   const rank = view.players.findIndex((p) => p.id === view.me.id) + 1;
   switch (view.phase) {
     case "lobby":
-      return "dance";
+      // The waiting room has everyone's ducks in it already.
+      return null;
     case "leaderboard":
       return rank <= 3 ? "celebrate" : "waddle";
     case "ended":
@@ -414,8 +416,9 @@ function playerMood(view: PlayerView): MascotAnimation | null {
     case "segment":
       // Minigames have the duck in the scene already.
       if (!seg || seg.kind === "minigame") return null;
-      // The arena has everyone's ducks in it already.
-      if (seg.arena) return null;
+      // The arena has everyone's ducks in it already (once the answers are up).
+      if (seg.arena && seg.stage !== "reading") return null;
+      if (seg.stage === "reading") return "idle";
       if (seg.stage !== "revealed") return "idle";
       if (seg.question?.type === "poll") return "quack";
       if ((view.myAward ?? 0) > 0) return "celebrate";
@@ -454,6 +457,9 @@ function StageBody({ view, send, offsetMs, feed }: StageProps) {
       <div className="space-y-4 pb-10 pt-2 text-center">
         <div>
           <h2 className="text-2xl font-bold">You're in, {view.me.name}!</h2>
+          <p className="text-neutral-600">
+            Try the controls while you wait: walk around, bump into people, quack.
+          </p>
           <p className="mt-1 font-semibold text-neutral-800">
             You're {crowned ? `${describeLook({ ...look, hat: "none" })} and the crown` : describeLook(look)}.
           </p>
@@ -463,6 +469,11 @@ function StageBody({ view, send, offsetMs, feed }: StageProps) {
             </p>
           )}
         </div>
+        <PlayerLobby
+          view={view}
+          feed={feed}
+          onMove={(move) => send({ t: "move", segmentId: LOBBY_FEED, move })}
+        />
         <div className="mx-auto max-w-md rounded-2xl bg-white p-4 shadow-sm">
           <h3 className="mb-2 text-left font-bold">Dress your duck</h3>
           <OutfitPicker
@@ -556,6 +567,19 @@ function QuestionStage({
 
   if (open && seg.round && now < seg.answersOpenAt) {
     return <GetReady now={now} until={seg.answersOpenAt} title={seg.round.title} />;
+  }
+
+  // The host is reading the question out; the answers (and your duck) come next.
+  if (seg.stage === "reading") {
+    return (
+      <div className="space-y-4 py-6 text-center">
+        <SegmentBadges seg={seg} />
+        <h2 className="text-2xl font-bold leading-snug sm:text-3xl">{q.prompt}</h2>
+        <p className="text-neutral-600" aria-live="polite">
+          Listen up! The answers appear in the arena in a moment.
+        </p>
+      </div>
+    );
   }
 
   return (

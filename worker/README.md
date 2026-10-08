@@ -66,8 +66,12 @@ point, or pause by showing the leaderboard.
 
 ## Answer arena
 
-Any multiple-choice question or poll can set `"arena": true` to be played by
-walking instead of tapping. Everyone's duck starts in a huddle in the middle;
+Every multiple-choice question and poll is played by walking instead of
+tapping (the host can untick "Walk to answer" when creating the room, and a
+question can opt out with `"arena": false`; lightning rounds always tap). Each
+arena question opens with just the question on screen for the host to read
+out; their next press ("Show the answers") opens the arena and starts the
+clock. Everyone's duck starts in a huddle in the middle;
 each answer owns a wedge around it, pointing the same way as the answer pad
 (up = 1 with four options). The middle grows with the crowd (about 7 units
 across the radius for 30 players, 6 for 12), always at least two duck lengths
@@ -99,6 +103,15 @@ arrived).
   positions; clients smooth between snapshots. Players' cameras follow their
   own duck, with each answer pinned to the screen edge in its direction; the
   host screen shows the whole arena with live counts.
+
+### The waiting room
+
+While the room is in the lobby, everyone who's connected gets a duck on an
+open patch (no answers, `lobbyLayout()`), simulated by the room's Durable
+Object exactly like the arena: walk, bump, quack, fly. It's there so people
+learn the controls before the first question. The host's lobby screen shows
+the patch with everyone milling about; a player who leaves takes their duck
+with them. The patch stops when the game starts.
 
 ### Players and PINs
 

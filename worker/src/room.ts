@@ -15,6 +15,7 @@ import type {
   ServerMessage,
   WrittenQuestion,
 } from "../../shared/protocol";
+import { LOBBY_FEED } from "../../shared/protocol";
 import {
   RuleError,
   addPlayer,
@@ -42,8 +43,10 @@ import {
   arenaMove,
   arenaSnapshot,
   createArenaSim,
+  createLobbySim,
   ensureDuck,
   freezeArena,
+  removeDuck,
   isArenaMove,
   tickArena,
   type ArenaSim,
@@ -253,17 +256,31 @@ export class Room extends DurableObject<Env> {
   }
 
   async webSocketClose(ws: WebSocket) {
-    // Whatever they were holding, they've let go.
-    const who = ws.deserializeAttachment() as Attachment | null;
-    if (who?.role === "player" && this.arena?.sim.walkers.has(who.playerId)) {
-      arenaMove(this.arena.sim, who.playerId, { held: [] });
+    try {
+      ws.close();
+    } catch {
+      // already closed
     }
-    ws.close();
-    this.broadcast();
+    this.leftSocket(ws);
   }
 
-  async webSocketError() {
+  async webSocketError(ws: WebSocket) {
+    this.leftSocket(ws);
+  }
+
+  /** A connection went away: let go of their keys; in the lobby, their duck leaves too. */
+  private leftSocket(ws: WebSocket) {
+    const who = ws.deserializeAttachment() as Attachment | null;
+    const arena = this.arena;
+    if (who?.role === "player" && arena?.sim.walkers.has(who.playerId)) {
+      arenaMove(arena.sim, who.playerId, { held: [] });
+      // (Unless they're still here in another tab.)
+      if (arena.segmentId === LOBBY_FEED && !this.connected().has(who.playerId)) {
+        removeDuck(arena.sim, who.playerId);
+      }
+    }
     this.broadcast();
+    this.syncArena();
   }
 
   // ---- Alarms: question deadlines and room expiry --------------------------
@@ -345,7 +362,12 @@ export class Room extends DurableObject<Env> {
   private syncArena() {
     const room = this.room;
     const open = room ? openArena(room) : null;
-    if (this.arena && (!open || open.segmentId !== this.arena.segmentId)) {
+    // In the lobby, whoever's connected waddles about an open patch to get
+    // used to the controls.
+    const connected = this.connected();
+    const lobby = !open && room?.phase === "lobby" && connected.size > 0;
+    const want = open ? open.segmentId : lobby ? LOBBY_FEED : null;
+    if (this.arena && this.arena.segmentId !== want) {
       // Answers are in: every duck stops dead where it stands, and one last
       // snapshot tells everyone (otherwise they'd keep waddling on screen).
       clearInterval(this.arena.timer);
@@ -353,17 +375,16 @@ export class Room extends DurableObject<Env> {
       this.sendSnapshot(this.arena, Date.now());
       this.arena = null;
     }
-    if (!open || this.arena || !room) return;
+    if (!want || this.arena || !room) return;
     // Spawn ducks for everyone connected, in join order so spots are stable.
-    const connected = this.connected();
     const ids = Object.values(room.players)
       .filter((p) => !p.kicked && connected.has(p.id))
       .sort((a, b) => (a.lookIndex ?? 0) - (b.lookIndex ?? 0))
       .map((p) => p.id);
     const now = Date.now();
     this.arena = {
-      segmentId: open.segmentId,
-      sim: createArenaSim(open.options.length, ids, open.players),
+      segmentId: want,
+      sim: open ? createArenaSim(open.options.length, ids, open.players) : createLobbySim(ids),
       timer: setInterval(() => this.arenaTick(), ARENA_TICK_MS),
       last: now,
       lastState: now,
