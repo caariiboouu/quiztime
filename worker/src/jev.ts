@@ -243,6 +243,7 @@ export async function judgeWritten(
     const res = await callJev(cfg, buildJudgeRequest(cfg.model, question, text));
     return combineJudgeAnswers(question, res);
   } catch (err) {
+    console.error(JSON.stringify({ event: "jev_error", error: err instanceof Error ? err.message : String(err) }));
     return {
       status: "error",
       suggestedPoints: 0,

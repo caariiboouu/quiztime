@@ -61,7 +61,15 @@ export function angleBetween(a: number, b: number): number {
 /** Nose to tail, roughly, at the size ducks are drawn. */
 export const DUCK_LENGTH = 1.3;
 /** Every answer is at least this many duck lengths' waddle from the huddle. */
-export const MIN_TRAVEL_DUCKS = 5;
+export const MIN_TRAVEL_DUCKS = 2;
+/**
+ * Size of the neutral middle, by crowd: grows with the square root of the
+ * number of players (the huddle's area grows with the crowd), so a handful
+ * of players have a short walk and a full room more room to jostle. About
+ * 7.2 across the radius for 30 players, 6 for 12, 5.1 for 4.
+ */
+const NEUTRAL_BASE = 3.9;
+const NEUTRAL_PER_ROOT_PLAYER = 0.6;
 /** Zone depth: how far from the neutral circle to the arena's edge. */
 const ZONE_DEPTH = 3.8;
 
@@ -69,7 +77,11 @@ export function arenaLayout(options: number, players: number): ArenaLayout {
   const n = Math.max(2, Math.floor(options));
   // A huddle just big enough for everyone, then a proper walk to any answer.
   const spawn = Math.max(1.0, Math.sqrt(Math.max(1, players)) * 0.46);
-  const neutral = spawn + MIN_TRAVEL_DUCKS * DUCK_LENGTH;
+  const neutral = Math.max(
+    NEUTRAL_BASE + NEUTRAL_PER_ROOT_PLAYER * Math.sqrt(Math.max(1, players)),
+    // Always a little walk from the huddle to any answer.
+    spawn + MIN_TRAVEL_DUCKS * DUCK_LENGTH,
+  );
   const radius = neutral + ZONE_DEPTH;
   const angles = PAD_DIRS[n]
     ? PAD_DIRS[n].map((d) => DIR_ANGLE[d])

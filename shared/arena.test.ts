@@ -50,8 +50,16 @@ describe("arena layout", () => {
     expect(arenaLayout(4, 64).neutral).toBeGreaterThan(arenaLayout(4, 4).neutral);
   });
 
-  it("puts every answer at least 5 duck lengths' walk from the huddle", () => {
-    for (const players of [1, 12, 30, 64]) {
+  it("scales the middle with the crowd: small groups walk less, big crowds get more room", () => {
+    const n = (players: number) => arenaLayout(4, players).neutral;
+    expect(n(4)).toBeLessThan(n(12));
+    expect(n(12)).toBeLessThan(n(30));
+    expect(n(30)).toBeLessThan(n(60));
+    expect(n(30)).toBeCloseTo(7.2, 1);
+  });
+
+  it("always leaves a walk of a couple of duck lengths from the huddle", () => {
+    for (const players of [1, 4, 12, 30, 64, 120]) {
       const l = arenaLayout(4, players);
       expect(l.neutral - l.spawn).toBeGreaterThanOrEqual(MIN_TRAVEL_DUCKS * DUCK_LENGTH - 1e-9);
     }

@@ -10,6 +10,9 @@
       { "name": "ACCOUNTS", "class_name": "Accounts" }
     ]
   },
+  // Workers Logs: every console.log/error is kept for a few days in the
+  // dashboard (Workers → quiztime-live → Logs); `wrangler tail` shows them live.
+  "observability": { "enabled": true },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["Room"] },
     { "tag": "v2", "new_sqlite_classes": ["Demo"] },

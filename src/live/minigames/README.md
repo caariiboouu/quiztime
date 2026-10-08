@@ -88,7 +88,7 @@ for big scenes).
   or one press = one waddle step (max two queued) with a very slight,
   rationed boost, wandering for AI
   ducks, avoidance steering, capsule-shaped bodies that can't overlap,
-  bumps (knock-back, flap, honk), crowd launches (3 different bumpers in 2 s
+  bumps (knock-back, flap, honk), crowd launches (3 different bumpers in 2.25 s
   sends a duck flying over everyone) and necks that bend away from neighbours.
 - `FlockScene.tsx`: all ducks in **one** canvas (browsers cap WebGL
   contexts), name tags, a ring under "you", and a `FlockControl` handle

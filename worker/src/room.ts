@@ -51,6 +51,7 @@ import {
 import { accountsStub } from "./accounts";
 import type { Env } from "./index";
 import { randomToken, timingSafeEqual } from "./secrets";
+import { logEvent } from "./log";
 
 /** Rooms are for one session; storage is wiped a day after creation. */
 const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
@@ -108,6 +109,7 @@ export class Room extends DurableObject<Env> {
   async init(code: string, hostKey: string, req: CreateRoomRequest): Promise<boolean> {
     if (this.room) return false;
     this.room = createRoom(code, hostKey, req, Date.now());
+    logEvent("room_created", { code, segments: req.show.segments.length });
     await this.save();
     return true;
   }
@@ -150,6 +152,10 @@ export class Room extends DurableObject<Env> {
       );
       await this.save();
       this.broadcast();
+      logEvent("room_join", {
+        code: this.room.code,
+        players: Object.values(this.room.players).filter((p) => !p.kicked).length,
+      });
       return { playerId: player.id, token: player.token };
     } catch (err) {
       if (err instanceof RuleError) return { error: err.message };

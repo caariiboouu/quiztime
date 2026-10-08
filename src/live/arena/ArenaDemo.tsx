@@ -17,8 +17,17 @@ import { useDemo } from "./useDemo";
  * with their own duck, with computer ducks making up the numbers. If the
  * server can't be reached, the same practice runs offline in the browser.
  */
-export function ArenaPractice({ offlineMembers }: { offlineMembers?: ArenaMember[] }) {
-  const demo = useDemo();
+export function ArenaPractice({
+  offlineMembers,
+  name,
+  onChangeName,
+}: {
+  offlineMembers?: ArenaMember[];
+  /** What to call your duck (blank: a random duck name). */
+  name?: string;
+  onChangeName?: () => void;
+}) {
+  const demo = useDemo(name);
   if (demo.status === "offline" || demo.status === "full") {
     return (
       <div className="space-y-3">
@@ -27,7 +36,7 @@ export function ArenaPractice({ offlineMembers }: { offlineMembers?: ArenaMember
             ? "The shared practice arena is full right now, so you're practising with computer ducks."
             : "Couldn't reach the practice server, so you're practising offline with computer ducks."}
         </p>
-        <OfflinePractice members={offlineMembers} />
+        <OfflinePractice members={offlineMembers} name={name} />
       </div>
     );
   }
@@ -45,6 +54,7 @@ export function ArenaPractice({ offlineMembers }: { offlineMembers?: ArenaMember
       feed={demo.feed}
       move={demo.move}
       reconnecting={demo.status === "reconnecting"}
+      onChangeName={onChangeName}
     />
   );
 }
@@ -55,12 +65,14 @@ function OnlinePractice({
   feed,
   move,
   reconnecting,
+  onChangeName,
 }: {
   state: DemoState;
   offsetMs: number;
   feed: ReturnType<typeof useDemo>["feed"];
   move: (m: ArenaMove) => void;
   reconnecting: boolean;
+  onChangeName?: () => void;
 }) {
   const options = useMemo(
     () => state.question.options.map((text, i) => ({ id: String(i), text })),
@@ -114,7 +126,16 @@ function OnlinePractice({
       footer={
         <p className="text-center text-sm text-neutral-500">
           {reconnecting && "Reconnecting… "}
-          You're <strong>{me?.name ?? "a duck"}</strong>.{" "}
+          You're <strong>{me?.name ?? "a duck"}</strong>
+          {onChangeName && (
+            <>
+              {" "}
+              <button type="button" onClick={onChangeName} className="underline">
+                (change name)
+              </button>
+            </>
+          )}
+          .{" "}
           {people === 1 ? "Just you so far" : `${people} people here`}
           {bots > 0 ? `, plus ${bots} computer duck${bots === 1 ? "" : "s"}.` : "."}
           {people === 1 && " Share the link to practise together."}
@@ -127,16 +148,16 @@ function OnlinePractice({
 const OFFLINE_CROWD = 12;
 
 /** The same practice, run in the browser with computer ducks (no server). */
-function OfflinePractice({ members: given }: { members?: ArenaMember[] }) {
+function OfflinePractice({ members: given, name }: { members?: ArenaMember[]; name?: string }) {
   const members = useMemo<ArenaMember[]>(
     () =>
       given ??
       Array.from({ length: OFFLINE_CROWD }, (_, i) => ({
         id: `duck-${i}`,
-        name: i === 0 ? "You" : DEMO_NAMES[i % DEMO_NAMES.length],
+        name: i === 0 ? name || "You" : DEMO_NAMES[i % DEMO_NAMES.length],
         look: lookForIndex(i),
       })),
-    [given],
+    [given, name],
   );
   const youId = members[0].id;
   const [qi, setQi] = useState(0);

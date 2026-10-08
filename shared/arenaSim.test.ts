@@ -54,9 +54,11 @@ describe("arena sim", () => {
     for (const id of ids) arenaMove(sim, id, { zone: 2 });
     run(sim, 10);
     const ws = [...sim.walkers.values()];
+    // Ducks launched over the crowd may pass above others; only grounded ones count.
+    const grounded = ws.filter((w) => w.air < 0.5);
     let worst = Infinity;
-    for (let i = 0; i < ws.length; i++)
-      for (let j = i + 1; j < ws.length; j++) worst = Math.min(worst, bodyGap(ws[i], ws[j]));
+    for (let i = 0; i < grounded.length; i++)
+      for (let j = i + 1; j < grounded.length; j++) worst = Math.min(worst, bodyGap(grounded[i], grounded[j]));
     expect(worst).toBeGreaterThan(-0.08);
     const inZone = ws.filter((w) => zoneAt(sim.layout, w.x, w.z) === 2).length;
     expect(inZone).toBeGreaterThan(20);

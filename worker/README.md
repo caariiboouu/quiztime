@@ -69,7 +69,9 @@ point, or pause by showing the leaderboard.
 Any multiple-choice question or poll can set `"arena": true` to be played by
 walking instead of tapping. Everyone's duck starts in a huddle in the middle;
 each answer owns a wedge around it, pointing the same way as the answer pad
-(up = 1 with four options), at least five duck lengths away. Where your duck
+(up = 1 with four options). The middle grows with the crowd (about 7 units
+across the radius for 30 players, 6 for 12), always at least two duck lengths
+from the huddle to any answer. Where your duck
 stands when time runs out is your answer (speed scoring counts from when you
 arrived).
 
@@ -90,7 +92,7 @@ arrived).
   are real mallard recordings (`public/sounds`, CC BY-SA, credited there),
   picked at random, quieter with distance and panned to their side, so a
   crowd is a cacophony. Capped at 14 voices; the presenter screen is silent.
-- Get bumped by 3 different ducks within 2 seconds and you're launched,
+- Get bumped by 3 different ducks within 2.25 seconds and you're launched,
   flapping, over the crowd (a crush of 30 sends a handful flying; two ducks
   bumping each other never can).
 - The Worker runs the simulation (`shared/arenaSim.ts`) at 10 Hz and streams

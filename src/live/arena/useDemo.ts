@@ -14,10 +14,11 @@ export type DemoStatus =
 
 /**
  * Join the shared practice arena on the Worker: you get a duck as soon as
- * you connect. If the server can't be reached at all, status goes
- * "offline" so the page can fall back to the local practice arena.
+ * you connect, called `name` if given (otherwise a random duck name). If the
+ * server can't be reached at all, status goes "offline" so the page can fall
+ * back to the local practice arena.
  */
-export function useDemo() {
+export function useDemo(name?: string) {
   const [status, setStatus] = useState<DemoStatus>(liveConfigured ? "connecting" : "offline");
   const [state, setState] = useState<DemoState | null>(null);
   const [offsetMs, setOffsetMs] = useState(0);
@@ -34,7 +35,8 @@ export function useDemo() {
     let retry: ReturnType<typeof setTimeout> | undefined;
 
     const connect = () => {
-      const ws = new WebSocket(`${API_BASE.replace(/^http/, "ws")}/api/demo/ws`);
+      const q = name ? `?name=${encodeURIComponent(name)}` : "";
+      const ws = new WebSocket(`${API_BASE.replace(/^http/, "ws")}/api/demo/ws${q}`);
       wsRef.current = ws;
       ws.onopen = () => {
         everOpened = true;
@@ -84,7 +86,7 @@ export function useDemo() {
       clearTimeout(retry);
       wsRef.current?.close();
     };
-  }, []);
+  }, [name]);
 
   const move = useCallback((m: ArenaMove) => {
     const ws = wsRef.current;

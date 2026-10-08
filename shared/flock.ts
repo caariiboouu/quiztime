@@ -123,12 +123,13 @@ const BUMP_MIN_CLOSING = 0.8;
 const BUMP_COOLDOWN = 0.9;
 const BUMP_SECONDS = 0.5;
 /**
- * Jostling: bumps from *different* ducks within this window (seconds) build up. Each
- * bump makes a hop, higher the more ducks have bumped you; at FLY_AT distinct
+ * Jostling: bumps from *different* ducks within this window (seconds) build
+ * up. Each bump makes a hop, higher the more ducks have bumped you; at FLY_AT distinct
  * bumpers you're launched over the crowd. Two ducks bumping each other only
- * ever count as one bumper, so a pair can never launch.
+ * ever count as one bumper, so a pair can never launch. With 2.25 s, about 3
+ * of 30 ducks take off in a normal game and about 12 in an all-in crush.
  */
-const JOSTLE_WINDOW = 2;
+const JOSTLE_WINDOW = 2.25;
 export const FLY_AT = 3;
 const HOP_SPEED = 2.0;
 const HOP_PER_BUMPER = 0.5;

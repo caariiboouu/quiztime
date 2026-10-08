@@ -34,10 +34,13 @@ import {
   type DemoState,
 } from "../../shared/demo";
 import type { Env } from "./index";
+import { logEvent } from "./log";
 
 const TICK_MS = 100;
 /** Per connection: more messages than this in a second are dropped. */
 const MAX_MESSAGES_PER_SEC = 40;
+/** Names people type for their practice duck. */
+const MAX_PRACTICE_NAME = 20;
 
 type Visitor = { ws: WebSocket; duck: DemoDuck; window: number; count: number };
 
@@ -61,14 +64,16 @@ export class Demo extends DurableObject<Env> {
     const { 0: client, 1: server } = new WebSocketPair();
     server.accept();
     if (this.visitors.size >= DEMO_MAX_PLAYERS) {
+      logEvent("practice_full", { people: this.visitors.size });
       this.send(server, { t: "full" });
       server.close(4002, "Practice arena is full");
       return new Response(null, { status: 101, webSocket: client });
     }
 
+    const asked = new URL(request.url).searchParams.get("name");
     const duck: DemoDuck = {
       id: crypto.randomUUID(),
-      name: this.freeName(),
+      name: this.nameFor(asked),
       lookIndex: this.nextLook++,
       bot: false,
     };
@@ -78,6 +83,7 @@ export class Demo extends DurableObject<Env> {
     const leave = () => this.leave(duck.id);
     server.addEventListener("close", leave);
     server.addEventListener("error", leave);
+    logEvent("practice_join", { people: this.visitors.size, named: Boolean(asked?.trim()) });
 
     if (!this.timer) {
       this.startRound(Date.now());
@@ -113,6 +119,7 @@ export class Demo extends DurableObject<Env> {
   private leave(id: string) {
     if (!this.visitors.delete(id)) return;
     if (this.sim) removeDuck(this.sim, id);
+    logEvent("practice_leave", { people: this.visitors.size });
     if (this.visitors.size === 0) {
       // Nobody watching: stop until the next visitor.
       if (this.timer) clearInterval(this.timer);
@@ -123,10 +130,33 @@ export class Demo extends DurableObject<Env> {
     this.broadcastState();
   }
 
+  private taken(): Set<string> {
+    const names = new Set([...this.visitors.values()].map((v) => v.duck.name.toLowerCase()));
+    for (const b of this.bots) names.add(b.name.toLowerCase());
+    return names;
+  }
+
+  /** The name they typed (tidied, and numbered if someone has it), or a random duck name. */
+  private nameFor(asked: string | null): string {
+    const clean = (asked ?? "")
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001f\u007f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, MAX_PRACTICE_NAME)
+      .trim();
+    if (!clean) return this.freeName();
+    const taken = this.taken();
+    if (!taken.has(clean.toLowerCase())) return clean;
+    for (let n = 2; ; n++) {
+      const numbered = `${clean.slice(0, MAX_PRACTICE_NAME - 3)} ${n}`;
+      if (!taken.has(numbered.toLowerCase())) return numbered;
+    }
+  }
+
   private freeName(): string {
-    const taken = new Set([...this.visitors.values()].map((v) => v.duck.name));
-    for (const b of this.bots) taken.add(b.name);
-    const free = DEMO_NAMES.filter((n) => !taken.has(n));
+    const taken = this.taken();
+    const free = DEMO_NAMES.filter((n) => !taken.has(n.toLowerCase()));
     if (free.length) return free[Math.floor(Math.random() * free.length)];
     return `Duck ${this.nextLook + 1}`;
   }
@@ -153,6 +183,7 @@ export class Demo extends DurableObject<Env> {
     this.sim = createArenaSim(DEMO_QUESTIONS[this.question].options.length, ids);
     this.brain = createBots([]);
     for (const b of this.bots) addBot(this.brain, b.id, 0);
+    logEvent("practice_round", { round: this.round, people: people.length, bots: this.bots.length });
     this.broadcastState();
   }
 
