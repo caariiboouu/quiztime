@@ -11,6 +11,7 @@ import type {
   JoinResponse,
   RoomInfo,
 } from "../../shared/protocol";
+import type { DuckHoursData } from "../types";
 
 /**
  * Where the live-quiz Worker lives. Set VITE_LIVE_API_URL at build time
@@ -66,6 +67,20 @@ export const loadSavedShow = (password: string) =>
 /** Replace the saved question set: every new game starts with it. */
 export const saveSavedShow = (password: string, show: Show) =>
   call<SavedShow>("/api/show/save", { method: "POST", body: JSON.stringify({ password, show }) });
+
+/** Replace the Ceramic Duck Hours standings (host password needed). */
+export const saveDuckStandings = (password: string, data: DuckHoursData) =>
+  call<{ data: DuckHoursData; updatedAt: number }>("/api/duck-hours/save", {
+    method: "POST",
+    body: JSON.stringify({ password, data }),
+  });
+
+/** Put back the Duck Hours standings from before the last change. */
+export const undoDuckStandings = (password: string) =>
+  call<{ data: DuckHoursData; updatedAt: number }>("/api/duck-hours/undo", {
+    method: "POST",
+    body: JSON.stringify({ password }),
+  });
 
 export const listAccounts = () => call<AccountList>("/api/accounts");
 

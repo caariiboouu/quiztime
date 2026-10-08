@@ -318,8 +318,15 @@ export type SegmentReveal = {
   roundTotals?: { playerId: string; name: string; points: number }[];
 };
 
+/** A finished game's results, once they've gone into the Duck Hours standings. */
+export type DuckHoursResult = { appliedAt: number; ranks: { playerId: string; rank: number }[] };
+
+/** Before they do: each player's new rank (1st holds the duck), and who's new to the board. */
+export type DuckHoursPreview = { playerId: string; name: string; rank: number; isNew: boolean }[];
+
 export type PlayerView = {
   role: "player";
+  duckHours: DuckHoursResult | null;
   code: string;
   title: string;
   serverNow: number;
@@ -356,6 +363,9 @@ export type HostSubmission = {
 
 export type HostView = {
   role: "host";
+  duckHours: DuckHoursResult | null;
+  /** At the end, before they're applied: the new Duck Hours ranks this game would set. */
+  duckPreview: DuckHoursPreview | null;
   /** There's a step to undo with "back". */
   canGoBack: boolean;
   code: string;
@@ -387,6 +397,8 @@ export type HostMessage =
   | { t: "close" }
   /** Undo the last advance, lock or end (pressed too early). */
   | { t: "back" }
+  /** At the end: this game's results become the new Ceramic Duck Hours ranks. */
+  | { t: "applyDuckHours" }
   | { t: "showLeaderboard" }
   | { t: "end" }
   | { t: "setFinalPoints"; playerId: string; points: number }

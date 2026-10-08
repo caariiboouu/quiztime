@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import bundledDuck from "../../data/duckHours.json";
-import { liveSeconds, normalizeDuckData } from "../../components/DuckHours";
 import type { DuckHoursData } from "../../types";
+import { liveSeconds } from "../../../shared/duckStandings";
+import { useDuckData, useDuckLeader } from "../duckStore";
 import { MAX_NAME_LENGTH, PIN_RE, type Account, type AccountSession } from "../../../shared/protocol";
 import {
   ApiError,
@@ -13,7 +13,6 @@ import {
   saveSession,
 } from "../api";
 import { Banner } from "../components";
-import { duckHoursLeader } from "../mascot/duckChampion";
 
 /** Someone you can be: a Duck Hours entry (claimed or not) or a newer player. */
 type Person = {
@@ -31,8 +30,7 @@ type Step =
   | { kind: "new" };
 
 /** Everyone on the Ceramic Duck Hours board, top of the standings first. */
-function duckBoard(): { id: string; initials: string }[] {
-  const data = normalizeDuckData(bundledDuck as DuckHoursData);
+function duckBoard(data: DuckHoursData): { id: string; initials: string }[] {
   const now = Date.now();
   return data.holders
     .filter((h) => h.initials.trim())
@@ -50,6 +48,8 @@ export function WhoAreYou({ onSignedIn }: { onSignedIn: (s: AccountSession) => v
   const [loadError, setLoadError] = useState<string | null>(null);
   const [step, setStep] = useState<Step>({ kind: "list" });
   const [filter, setFilter] = useState("");
+  const duck = useDuckData();
+  const leader = useDuckLeader();
 
   useEffect(() => {
     listAccounts().then(
@@ -60,9 +60,8 @@ export function WhoAreYou({ onSignedIn }: { onSignedIn: (s: AccountSession) => v
 
   const people = useMemo<Person[]>(() => {
     if (!accounts) return [];
-    const leader = duckHoursLeader();
     const byHolder = new Map(accounts.filter((a) => a.holderId).map((a) => [a.holderId!, a]));
-    const board = duckBoard().map((h) => ({
+    const board = duckBoard(duck).map((h) => ({
       key: `h:${h.id}`,
       name: h.initials,
       holderId: h.id,
@@ -74,7 +73,7 @@ export function WhoAreYou({ onSignedIn }: { onSignedIn: (s: AccountSession) => v
       .filter((a) => !a.holderId || !onBoard.has(a.holderId))
       .map((a) => ({ key: `a:${a.id}`, name: a.name, holderId: a.holderId, account: a, leader: false }));
     return [...board, ...others];
-  }, [accounts]);
+  }, [accounts, duck, leader]);
 
   const saved = useMemo(() => {
     const sessions = loadSessions();

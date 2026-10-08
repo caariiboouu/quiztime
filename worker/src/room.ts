@@ -28,6 +28,7 @@ import {
   loadRoom,
   nextDeadline,
   openArena,
+  duckHoursProposal,
   setArenaAnswers,
   playerAction,
   playerByToken,
@@ -53,6 +54,7 @@ import {
   type ArenaSim,
 } from "../../shared/arenaSim";
 import { accountsStub } from "./accounts";
+import { standingsStub } from "./standings";
 import type { Env } from "./index";
 import { randomToken, timingSafeEqual } from "./secrets";
 import { logEvent } from "./log";
@@ -218,6 +220,10 @@ export class Room extends DurableObject<Env> {
       this.send(ws, { t: "pong", serverNow: Date.now() });
       return;
     }
+    if (msg.t === "applyDuckHours") {
+      if (who.role === "host") await this.applyDuckHours(ws);
+      return;
+    }
     if (msg.t === "move") {
       // Arena steps are applied to the live simulation, not stored.
       const arena = this.arena;
@@ -364,6 +370,46 @@ export class Room extends DurableObject<Env> {
     finishJudging(this.room, segId);
     await this.save();
     this.broadcast();
+  }
+
+  /**
+   * The game's over: its final standings become the new Ceramic Duck Hours
+   * ranks (time banked, newcomers added to the board, absentees benched).
+   * Once per game.
+   */
+  private applyingDuckHours = false;
+  private async applyDuckHours(ws: WebSocket) {
+    const room = this.room;
+    if (!room) return;
+    const refuse = (message: string) => this.send(ws, { t: "error", message });
+    if (room.phase !== "ended") return refuse("Finish the game first.");
+    if (room.duckHours || this.applyingDuckHours) return refuse("This game is already in the Duck Hours standings.");
+    const ranked = duckHoursProposal(room);
+    if (ranked.length === 0) return refuse("Nobody here to rank.");
+    this.applyingDuckHours = true;
+    try {
+      const now = Date.now();
+      const res = await standingsStub(this.env).applyQuiz(
+        ranked.map(({ holderId, name, rank }) => ({ holderId, name, rank })),
+        now,
+      );
+      if ("error" in res) return refuse(res.error);
+      // Newcomers now have an entry on the board: link it to them.
+      await Promise.all(
+        res.holderIds.map(async (holderId, i) => {
+          const p = room.players[ranked[i].playerId];
+          if (!p || p.duckHolderId) return;
+          p.duckHolderId = holderId;
+          if (p.accountId) await accountsStub(this.env).setHolder(p.accountId, holderId);
+        }),
+      );
+      room.duckHours = { appliedAt: now, ranks: ranked.map(({ playerId, rank }) => ({ playerId, rank })) };
+      logEvent("duck_hours_applied", { code: room.code, players: ranked.length });
+      await this.save();
+      this.broadcast();
+    } finally {
+      this.applyingDuckHours = false;
+    }
   }
 
   /** Start or stop the arena simulation to match the room. */

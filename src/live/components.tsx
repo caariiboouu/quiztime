@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type {
   ChoiceOption,
   PublicPlayer,
@@ -8,7 +8,7 @@ import type {
 } from "../../shared/protocol";
 import { ARROW, useControls, type Control } from "./controls";
 import { DuckAvatar } from "./mascot/DuckAvatar";
-import { duckHoursLeader } from "./mascot/duckChampion";
+import { useDuckLeader } from "./duckStore";
 import { lookFor } from "./mascot/variants";
 
 /**
@@ -173,7 +173,7 @@ export function Leaderboard({
   limit?: number;
 }) {
   const teamById = new Map(teams.map((t) => [t.id, t]));
-  const leader = useMemo(() => duckHoursLeader(), []);
+  const leader = useDuckLeader();
   const top = players.slice(0, limit);
   const me = highlightId ? players.findIndex((p) => p.id === highlightId) : -1;
   return (

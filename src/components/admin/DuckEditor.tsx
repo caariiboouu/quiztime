@@ -1,13 +1,7 @@
 import { useState } from "react";
 import type { BonusAward, DuckHolder, DuckHoursData } from "../../types";
-import {
-  cappedElapsedMs,
-  formatDuration,
-  fractionLabel,
-  normalizeDuckData,
-  ordinal,
-  rankFraction,
-} from "../DuckHours";
+import { formatDuration, fractionLabel, ordinal } from "../DuckHours";
+import { bankAll, normalizeDuckData } from "../../../shared/duckStandings";
 
 type DuckEditorProps = {
   data: DuckHoursData;
@@ -16,16 +10,6 @@ type DuckEditorProps = {
 
 function newHolderId(): string {
   return `duck-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-}
-
-/** Bank each ranked holder's live elapsed time (at their rate) into their total. */
-function bankAll(data: DuckHoursData, nowMs: number): DuckHolder[] {
-  const elapsed = cappedElapsedMs(data.heldSince, nowMs) / 1000;
-  if (!elapsed) return data.holders;
-  return data.holders.map((h) => ({
-    ...h,
-    accumulatedSeconds: h.accumulatedSeconds + elapsed * rankFraction(h.rank),
-  }));
 }
 
 export function DuckEditor({ data: rawData, onChange }: DuckEditorProps) {

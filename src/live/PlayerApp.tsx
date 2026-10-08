@@ -43,6 +43,7 @@ import { useRoom, useServerNow, type ArenaFeed, type RoomStatus } from "./useRoo
 import { PlayerArena, PlayerLobby } from "./arena/ArenaViews";
 import { OutfitPicker } from "./account/OutfitPicker";
 import { WhoAreYou } from "./account/WhoAreYou";
+import { DuckHoursStandings, QuizPodium } from "./results";
 
 export function PlayerApp({ code, onExit }: { code: string | null; onExit: () => void }) {
   const [creds, setCreds] = useState<PlayerCreds | null>(() =>
@@ -449,6 +450,32 @@ function PlayerStage(props: StageProps) {
   );
 }
 
+/** After the game: your new Ceramic Duck Hours standing, once the host applies it. */
+function PlayerDuckHours({ view }: { view: PlayerView }) {
+  const mine = view.duckHours?.ranks.find((r) => r.playerId === view.me.id);
+  return (
+    <section className="space-y-3 rounded-2xl border border-amber-300 bg-amber-50 p-4">
+      <h3 className="text-lg font-bold">🦆 Ceramic Duck Hours</h3>
+      {view.duckHours ? (
+        <>
+          {mine && (
+            <p className="font-semibold" aria-live="polite">
+              {mine.rank === 1
+                ? "You hold the duck now! 🦆 Full rate until the next quiz."
+                : `You're ranked ${mine.rank}: you earn 1/${mine.rank} of the rate until the next quiz.`}
+            </p>
+          )}
+          <DuckHoursStandings players={view.players} result={view.duckHours} meHolderId={view.me.duckHolderId} />
+        </>
+      ) : (
+        <p className="text-sm text-neutral-700">
+          The host will put this game into the Ceramic Duck Hours standings in a moment.
+        </p>
+      )}
+    </section>
+  );
+}
+
 function StageBody({ view, send, offsetMs, feed }: StageProps) {
   if (view.phase === "lobby") {
     const look = lookFor(view.me.lookIndex, view.me.outfit);
@@ -498,12 +525,14 @@ function StageBody({ view, send, offsetMs, feed }: StageProps) {
         <h2 className="text-center text-2xl font-bold" aria-live="polite">
           {view.phase === "ended" ? `Final: you placed #${rank}!` : `You're #${rank}`}
         </h2>
+        {view.phase === "ended" && <QuizPodium players={view.players} />}
         <Leaderboard
           players={view.players}
           teams={view.teams}
           teamMode={view.settings.teamMode}
           highlightId={view.me.id}
         />
+        {view.phase === "ended" && <PlayerDuckHours view={view} />}
       </div>
     );
   }

@@ -13,6 +13,9 @@
  *   POST /api/accounts/:id/reset host resets a forgotten PIN (needs HOST_PASSWORD)
  *   POST /api/show/load          the saved question set, answers and all (needs HOST_PASSWORD)
  *   POST /api/show/save          replace the saved question set (needs HOST_PASSWORD)
+ *   GET  /api/duck-hours         the Ceramic Duck Hours standings (public)
+ *   POST /api/duck-hours/save    replace the standings (needs HOST_PASSWORD)
+ *   POST /api/duck-hours/undo    put back the standings from before the last change
  */
 import type {
   CreateAccountRequest,
@@ -27,12 +30,15 @@ import type {
 } from "../../shared/protocol";
 import { Accounts, accountsStub } from "./accounts";
 import { Library, libraryStub } from "./library";
+import { Standings, standingsStub } from "./standings";
+import { standingsError } from "../../shared/duckStandings";
+import type { DuckHoursData } from "../../src/types";
 import { validateSettings, validateShow } from "./engine";
 import { Demo } from "./demo";
 import { Room } from "./room";
 import { randomToken, timingSafeEqual } from "./secrets";
 
-export { Accounts, Demo, Library, Room };
+export { Accounts, Demo, Library, Room, Standings };
 
 export interface Env {
   ROOMS: DurableObjectNamespace<Room>;
@@ -42,6 +48,8 @@ export interface Env {
   ACCOUNTS: DurableObjectNamespace<Accounts>;
   /** The host's saved question set (one object). */
   LIBRARY: DurableObjectNamespace<Library>;
+  /** The Ceramic Duck Hours standings (one object). */
+  STANDINGS: DurableObjectNamespace<Standings>;
   /** Secret: password the host types to create a room. */
   HOST_PASSWORD: string;
   /** Secret: TypeSafe API key for Jev. Without it, written answers are hand-scored. */
@@ -118,6 +126,33 @@ export default {
     }
     if (url.pathname === "/api/demo/stats" && request.method === "GET") {
       return json(await env.DEMO.get(env.DEMO.idFromName("demo")).getStats(), 200, origin);
+    }
+
+    if (url.pathname === "/api/duck-hours" && request.method === "GET") {
+      const standings = standingsStub(env);
+      const stored = await standings.get();
+      return stored
+        ? json({ ...stored, canUndo: await standings.canUndo() }, 200, origin)
+        : json({ error: "Not loaded yet" }, 404, origin);
+    }
+    if (url.pathname === "/api/duck-hours/undo" && request.method === "POST") {
+      const body = await readJson<{ password: string }>(request);
+      if (!body) return json({ error: "Invalid JSON" }, 400, origin);
+      if (!env.HOST_PASSWORD || !timingSafeEqual(String(body.password ?? ""), env.HOST_PASSWORD)) {
+        return json({ error: "Wrong host password" }, 401, origin);
+      }
+      const stored = await standingsStub(env).undo(Date.now());
+      return stored ? json(stored, 200, origin) : json({ error: "Nothing to undo" }, 409, origin);
+    }
+    if (url.pathname === "/api/duck-hours/save" && request.method === "POST") {
+      const body = await readJson<{ password: string; data: DuckHoursData }>(request);
+      if (!body) return json({ error: "Invalid JSON" }, 400, origin);
+      if (!env.HOST_PASSWORD || !timingSafeEqual(String(body.password ?? ""), env.HOST_PASSWORD)) {
+        return json({ error: "Wrong host password" }, 401, origin);
+      }
+      const problem = standingsError(body.data);
+      if (problem) return json({ error: problem }, 400, origin);
+      return json(await standingsStub(env).save(body.data, Date.now()), 200, origin);
     }
 
     if ((url.pathname === "/api/show/load" || url.pathname === "/api/show/save") && request.method === "POST") {

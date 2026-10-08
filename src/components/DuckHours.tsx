@@ -1,38 +1,14 @@
 import { useEffect, useState } from "react";
-import bundledDuck from "../data/duckHours.json";
-import type { DuckHolder, DuckHoursData } from "../types";
-import { useOverridableJson } from "../hooks/useOverridableJson";
 import { NavBar } from "./NavBar";
+import { useDuckData } from "../live/duckStore";
+import { liveSeconds } from "../../shared/duckStandings";
+
 
 export const DUCK_OVERRIDE_KEY = "quiztime.duckHours.override";
 
 /** Where self-serve name-change requests are emailed for manual approval. */
 const REQUEST_EMAIL = "joel@cuthriell.com";
 const RENAME_GUARD_MS = 24 * 60 * 60 * 1000;
-
-/** Rate at which a given rank earns duck-time. 1st = 1×, 2nd = ½×, 3rd = ⅓×… */
-export function rankFraction(rank: number | null): number {
-  return rank && rank >= 1 ? 1 / rank : 0;
-}
-
-/**
- * Cap on how much time counts toward accrual since the standings last
- * changed. Meetings land on an irregular schedule, so without a cap
- * whoever goes the longest between quizzes would rack up an unfair lead;
- * capping at 30 days keeps a single stretch worth at most a month.
- */
-export const MAX_ACCRUAL_MS = 30 * 24 * 60 * 60 * 1000;
-
-/** Milliseconds elapsed since `heldSince`, clamped to [0, MAX_ACCRUAL_MS]. */
-export function cappedElapsedMs(
-  heldSince: string | null,
-  now: number,
-): number {
-  if (!heldSince) return 0;
-  const since = Date.parse(heldSince);
-  if (Number.isNaN(since)) return 0;
-  return Math.min(Math.max(0, now - since), MAX_ACCRUAL_MS);
-}
 
 const FRACTION_GLYPH: Record<number, string> = {
   1: "1×",
@@ -56,44 +32,6 @@ export function ordinal(n: number): string {
   return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
 }
 
-/**
- * Accept both the current shape and the older { currentHolderId } shape so
- * previously-saved data keeps working.
- */
-export function normalizeDuckData(
-  raw: DuckHoursData & { currentHolderId?: string | null },
-): DuckHoursData {
-  const currentHolderId = raw.currentHolderId ?? null;
-  const holders: DuckHolder[] = (raw.holders ?? []).map((h) => ({
-    id: h.id,
-    initials: h.initials ?? "",
-    accumulatedSeconds: h.accumulatedSeconds ?? 0,
-    rank:
-      h.rank !== undefined && h.rank !== null
-        ? h.rank
-        : currentHolderId === h.id
-          ? 1
-          : null,
-  }));
-  return {
-    holders,
-    heldSince: raw.heldSince ?? null,
-    bonusLog: raw.bonusLog ?? [],
-  };
-}
-
-/** Banked seconds plus, for ranked holders, live elapsed time at their rate. */
-export function liveSeconds(
-  data: DuckHoursData,
-  holderId: string,
-  now: number,
-): number {
-  const holder = data.holders.find((h) => h.id === holderId);
-  if (!holder) return 0;
-  const elapsedSeconds = cappedElapsedMs(data.heldSince, now) / 1000;
-  return holder.accumulatedSeconds + elapsedSeconds * rankFraction(holder.rank);
-}
-
 /** "12h 04m" or, with seconds, "12h 04m 33s". */
 export function formatDuration(totalSeconds: number, withSeconds = false): string {
   const s = Math.max(0, Math.floor(totalSeconds));
@@ -110,11 +48,8 @@ type DuckHoursProps = {
 };
 
 export function DuckHours({ onExit }: DuckHoursProps) {
-  const { data: raw } = useOverridableJson<DuckHoursData>(
-    DUCK_OVERRIDE_KEY,
-    bundledDuck as DuckHoursData,
-  );
-  const data = normalizeDuckData(raw);
+  // The live standings from the quiz server (the bundled copy until they load).
+  const data = useDuckData();
 
   // Re-render once a second so the live clock ticks.
   const [now, setNow] = useState(() => Date.now());

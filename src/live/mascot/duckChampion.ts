@@ -1,21 +1,11 @@
-import bundledDuck from "../../data/duckHours.json";
-import { liveSeconds, normalizeDuckData } from "../../components/DuckHours";
-import type { DuckHoursData } from "../../types";
+import { leaderOf } from "../../../shared/duckStandings";
+import { duckData } from "../duckStore";
 
 /**
- * Whoever leads the Ceramic Duck Hours standings right now (by live total),
- * from the published standings. Their linked duck wears the gold crown.
+ * Whoever leads the Ceramic Duck Hours standings right now (by live total).
+ * Their linked duck wears the gold crown. Components should prefer
+ * useDuckLeader() (re-renders when the live standings arrive).
  */
 export function duckHoursLeader(now = Date.now()): string | null {
-  const data = normalizeDuckData(bundledDuck as DuckHoursData);
-  let best: string | null = null;
-  let bestSeconds = -1;
-  for (const h of data.holders) {
-    const s = liveSeconds(data, h.id, now);
-    if (s > bestSeconds) {
-      bestSeconds = s;
-      best = h.id;
-    }
-  }
-  return best;
+  return leaderOf(duckData(), now);
 }

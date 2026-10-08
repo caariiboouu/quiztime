@@ -14,8 +14,11 @@ devices with a room code, and a host runs the show from a presenter screen.
 - **3D minigames** between questions (Mario Party style, three.js), see
   `src/live/minigames/README.md`.
 - **Teams** (score = average per member).
-- **Ceramic Duck Hours:** players can link their duck entry when joining;
-  bonus rules are a stub in `shared/duckBonus.ts`.
+- **Ceramic Duck Hours:** the standings live on the server now (`Standings`
+  Durable Object, `worker/src/standings.ts`, rules in `shared/duckStandings.ts`).
+  At the end of a game the host presses "Update the Duck Hours standings": the
+  final placings become the new ranks (1st holds the duck), time so far is
+  banked, absentees are benched and newcomers added to the board.
 
 ## Accessibility
 
@@ -154,7 +157,8 @@ arrive once its connections close.
 | - | - |
 | `shared/protocol.ts` | Data model and wire protocol used by both sides |
 | `shared/scoring.ts` | Speed bonus, placement points, team averages |
-| `shared/duckBonus.ts` | **Stub:** Duck Hours bonus rules |
+| `shared/duckStandings.ts` | Ceramic Duck Hours rules: accrual, banking, ranks from a quiz |
+| `worker/src/standings.ts` | Durable Object: the Duck Hours standings |
 | `shared/flock.ts` | Duck movement: steps, steering, collisions, bumps, neck bending |
 | `shared/arena.ts`, `shared/arenaSim.ts` | Answer arena layout and simulation |
 | `shared/demo.ts`, `shared/arenaBots.ts` | Practice arena questions and computer ducks |

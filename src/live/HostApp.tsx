@@ -1,6 +1,5 @@
 import { useState } from "react";
 import sampleShow from "../data/liveSampleShow.json";
-import { proposeDuckBonuses } from "../../shared/duckBonus";
 import type {
   HostSubmission,
   HostView,
@@ -36,6 +35,8 @@ import {
 import { useControls } from "./controls";
 import { Mascot } from "./mascot/Mascot";
 import { PinResets } from "./account/PinResets";
+import { DuckHoursAdmin } from "./host/DuckHoursAdmin";
+import { DuckHoursPreviewList, DuckHoursStandings, QuizPodium } from "./results";
 import { lookFor } from "./mascot/variants";
 import { duckHoursLeader } from "./mascot/duckChampion";
 import { QuestionEditor } from "./host/QuestionEditor";
@@ -420,7 +421,8 @@ function HostSetup({
           {busy === "create" ? "Creating…" : dirty ? "Save questions and create room" : "Create room"}
         </button>
       </form>
-      <div className="mx-auto max-w-2xl px-6 pb-10">
+      <div className="mx-auto max-w-2xl space-y-4 px-6 pb-10">
+        <DuckHoursAdmin password={password} />
         <PinResets password={password} />
       </div>
     </div>
@@ -738,8 +740,9 @@ function HostStage({
             {view.phase === "ended" ? `${top.name} wins!` : `${top.name} is in the lead`}
           </p>
         )}
+        {view.phase === "ended" && <QuizPodium players={view.players} />}
         <Leaderboard players={view.players} teams={view.teams} teamMode={view.settings.teamMode} />
-        {view.phase === "ended" && <DuckBonusPanel view={view} />}
+        {view.phase === "ended" && <DuckHoursPanel view={view} send={send} />}
       </div>
     );
   }
@@ -1131,26 +1134,49 @@ function QnaPanel({ view, send }: { view: HostView; send: Send }) {
   );
 }
 
-function DuckBonusPanel({ view }: { view: HostView }) {
-  const proposals = proposeDuckBonuses(view);
-  const linked = view.players.filter((p) => p.duckHolderId).length;
-  return (
-    <section className="mx-auto max-w-2xl rounded-2xl border border-amber-300 bg-amber-50 p-5">
-      <h3 className="font-semibold">🦆 Ceramic Duck Hours</h3>
-      {proposals.length === 0 ? (
-        <p className="mt-1 text-sm text-neutral-700">
-          Bonus rules aren't set up yet (see <code>shared/duckBonus.ts</code>). {linked} of{" "}
-          {view.players.length} players linked a duck entry.
+/**
+ * The end of the game: this game's final standings become the new Ceramic
+ * Duck Hours ranks (1st holds the duck). The host previews and applies them;
+ * then everyone sees the updated Duck Hours leaderboard.
+ */
+function DuckHoursPanel({ view, send }: { view: HostView; send: Send }) {
+  if (view.duckHours) {
+    const holder = view.duckHours.ranks.find((r) => r.rank === 1);
+    const name = view.players.find((p) => p.id === holder?.playerId)?.name;
+    return (
+      <section className="mx-auto max-w-2xl space-y-3 rounded-2xl border border-amber-300 bg-amber-50 p-5">
+        <h3 className="text-xl font-bold">🦆 Ceramic Duck Hours</h3>
+        <p className="text-sm text-neutral-700">
+          Updated from this game{name ? `: ${name} holds the duck now.` : "."}
         </p>
+        <DuckHoursStandings players={view.players} result={view.duckHours} />
+      </section>
+    );
+  }
+  const preview = view.duckPreview ?? [];
+  return (
+    <section className="mx-auto max-w-2xl space-y-3 rounded-2xl border border-amber-300 bg-amber-50 p-5">
+      <h3 className="text-xl font-bold">🦆 Ceramic Duck Hours</h3>
+      <p className="text-sm text-neutral-700">
+        This game's results set the new ranks: 1st holds the duck (full rate), 2nd earns ½×, and
+        so on. Everyone's time so far is banked first; anyone on the board who didn't play is
+        benched until they play again, and newcomers are added.
+      </p>
+      {preview.length > 0 ? (
+        <DuckHoursPreviewList preview={preview} />
       ) : (
-        <ul className="mt-2 space-y-1 text-sm">
-          {proposals.map((p, i) => (
-            <li key={i}>
-              {p.playerName}: +{Math.round(p.seconds / 60)} min {p.reason && `(${p.reason})`}
-            </li>
-          ))}
-        </ul>
+        <p className="text-sm text-neutral-600">Nobody signed in played this game.</p>
       )}
+      <button
+        type="button"
+        disabled={preview.length === 0}
+        onClick={() => {
+          if (confirm("Update the Ceramic Duck Hours standings from this game?")) send({ t: "applyDuckHours" });
+        }}
+        className="w-full rounded-xl bg-amber-500 py-3 font-bold text-white shadow hover:brightness-110 disabled:opacity-40"
+      >
+        Update the Duck Hours standings
+      </button>
     </section>
   );
 }

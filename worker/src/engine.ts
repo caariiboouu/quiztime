@@ -38,8 +38,10 @@ import {
   type Show,
   type ShowSegment,
   type Submission,
+  type DuckHoursResult,
 } from "../../shared/protocol";
 import { cleanOutfit, type DuckOutfit } from "../../shared/outfit";
+import { ranksFromScores } from "../../shared/duckStandings";
 import {
   numericAwards,
   placementAwards,
@@ -121,6 +123,8 @@ export type RoomState = {
   qna: QnaItem[];
   /** Game progress before each recent host step, newest last, for "back". */
   undo?: UndoStep[];
+  /** Set once this game's results have gone into the Duck Hours standings. */
+  duckHours?: DuckHoursResult | null;
 };
 
 /**
@@ -579,6 +583,21 @@ function openSegment(state: RoomState, index: number, now: number, seed: number)
   };
 }
 
+/**
+ * The new Duck Hours ranks this finished game would set: everyone who played
+ * as an account (or with a Duck Hours entry), by final score, ties sharing a
+ * place. Players without an entry get added to the board.
+ */
+export function duckHoursProposal(
+  state: RoomState,
+): { playerId: string; holderId: string | null; name: string; rank: number }[] {
+  const s = scores(state);
+  const players = Object.values(state.players)
+    .filter((p) => !p.kicked && (p.accountId || p.duckHolderId))
+    .map((p) => ({ playerId: p.id, holderId: p.duckHolderId, name: p.name, score: s.get(p.id) ?? 0 }));
+  return ranksFromScores(players).map(({ playerId, holderId, name, rank }) => ({ playerId, holderId, name, rank }));
+}
+
 /** Note where the game is before a host step, so "back" can undo it. */
 function remember(state: RoomState, now: number) {
   const step: UndoStep = structuredClone({
@@ -876,6 +895,9 @@ export function hostAction(
       return closeSegment(state, ctx.judgeAvailable, ctx.now);
     case "back":
       return goBack(state, ctx.now);
+    case "applyDuckHours":
+      // Talks to the standings, so the Durable Object handles it (room.ts).
+      return {};
     case "showLeaderboard":
       if (state.phase === "segment") state.phase = "leaderboard";
       return {};
@@ -1162,6 +1184,7 @@ export function playerView(
   const revealed = state.run?.stage === "revealed";
   return {
     role: "player",
+    duckHours: state.duckHours ?? null,
     code: state.code,
     title: state.title,
     serverNow: now,
@@ -1236,6 +1259,16 @@ export function hostView(
     : [];
   return {
     role: "host",
+    duckHours: state.duckHours ?? null,
+    duckPreview:
+      state.phase === "ended" && !state.duckHours
+        ? duckHoursProposal(state).map((p) => ({
+            playerId: p.playerId,
+            name: p.name,
+            rank: p.rank,
+            isNew: p.holderId === null,
+          }))
+        : null,
     code: state.code,
     title: state.title,
     serverNow: now,

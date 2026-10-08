@@ -206,6 +206,11 @@ export class Accounts extends DurableObject<Env> {
     return r ? toAccount(r) : null;
   }
 
+  /** They've been added to the Duck Hours board: link the new entry. */
+  async setHolder(id: string, holderId: string): Promise<void> {
+    this.sql.exec("UPDATE accounts SET holder_id = ? WHERE id = ? AND holder_id IS NULL", holderId, id);
+  }
+
   async setOutfit(id: string, outfit: DuckOutfit | null): Promise<void> {
     this.sql.exec("UPDATE accounts SET outfit = ? WHERE id = ?", outfit ? JSON.stringify(outfit) : null, id);
   }

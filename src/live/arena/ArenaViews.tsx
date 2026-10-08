@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { arenaLayout, lobbyLayout } from "../../../shared/arena";
 import type { HostView, PlayerView, PublicPlayer, PublicSegment } from "../../../shared/protocol";
-import { duckHoursLeader } from "../mascot/duckChampion";
+import { useDuckLeader } from "../duckStore";
 import { lookFor } from "../mascot/variants";
 import type { DuckOutfit } from "../../../shared/outfit";
 import type { ArenaFeed } from "../useRoom";
@@ -18,8 +18,8 @@ type Options = { id: string; text: string }[];
 /** Members for the arena, rebuilt only when someone joins or leaves. */
 function useMembers(players: PublicPlayer[]): ArenaMember[] {
   const key = JSON.stringify(players.map((p) => [p.id, p.lookIndex, p.name, p.duckHolderId, p.outfit]));
+  const leader = useDuckLeader();
   return useMemo(() => {
-    const leader = duckHoursLeader();
     type Row = [string, number, string, string | null, DuckOutfit | null];
     return (JSON.parse(key) as Row[]).map(([id, look, name, duck, outfit]) => ({
       id,
@@ -27,7 +27,7 @@ function useMembers(players: PublicPlayer[]): ArenaMember[] {
       look: lookFor(look, outfit),
       crowned: duck !== null && duck === leader,
     }));
-  }, [key]);
+  }, [key, leader]);
 }
 
 function useArena(seg: PublicSegment, options: Options, players: PublicPlayer[], feed: { current: ArenaFeed }) {

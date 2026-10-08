@@ -10,7 +10,6 @@ import { TRIVIA_OVERRIDE_KEY } from "../games/AFTrivia";
 import { DUCK_OVERRIDE_KEY } from "../DuckHours";
 import { QuizEditor } from "./QuizEditor";
 import { TriviaEditor } from "./TriviaEditor";
-import { DuckEditor } from "./DuckEditor";
 import { GithubError, getFile, putFile } from "../../lib/github";
 import {
   decryptString,
@@ -437,69 +436,69 @@ function Inner({
                 Unsaved changes
               </span>
             )}
-            <button
-              type="button"
-              disabled={saveStatus.state === "saving"}
-              onClick={() => void saveToRepo()}
-              className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {saveStatus.state === "saving" ? "Saving…" : "Save to repo"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (tab === "quiz") downloadJson("quiz.json", quiz.data);
-                else if (tab === "trivia")
-                  downloadJson("afTrivia.json", trivia.data);
-                else downloadJson("duckHours.json", duck.data);
-              }}
-              className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
-            >
-              Export
-            </button>
             {tab !== "duck" && (
-              <button
-                type="button"
-                onClick={() =>
-                  tab === "quiz"
-                    ? quizImportRef.current?.click()
-                    : triviaImportRef.current?.click()
-                }
-                className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
-              >
-                Import
-              </button>
+              <>
+                <button
+                  type="button"
+                  disabled={saveStatus.state === "saving"}
+                  onClick={() => void saveToRepo()}
+                  className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {saveStatus.state === "saving" ? "Saving…" : "Save to repo"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (tab === "quiz") downloadJson("quiz.json", quiz.data);
+                    else downloadJson("afTrivia.json", trivia.data);
+                  }}
+                  className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+                >
+                  Export
+                </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      tab === "quiz"
+                        ? quizImportRef.current?.click()
+                        : triviaImportRef.current?.click()
+                    }
+                    className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+                  >
+                    Import
+                  </button>
+                <input
+                  ref={quizImportRef}
+                  type="file"
+                  accept="application/json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void handleImport(f, "quiz");
+                    e.target.value = "";
+                  }}
+                />
+                <input
+                  ref={triviaImportRef}
+                  type="file"
+                  accept="application/json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void handleImport(f, "trivia");
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={resetTab}
+                  disabled={!active.isOverridden}
+                  className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Reset
+                </button>
+              </>
             )}
-            <input
-              ref={quizImportRef}
-              type="file"
-              accept="application/json"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void handleImport(f, "quiz");
-                e.target.value = "";
-              }}
-            />
-            <input
-              ref={triviaImportRef}
-              type="file"
-              accept="application/json"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void handleImport(f, "trivia");
-                e.target.value = "";
-              }}
-            />
-            <button
-              type="button"
-              onClick={resetTab}
-              disabled={!active.isOverridden}
-              className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Reset
-            </button>
           </div>
         </div>
         <div className="mx-auto w-full max-w-4xl px-6 pb-3 text-xs text-neutral-500">
@@ -533,7 +532,22 @@ function Inner({
       ) : tab === "trivia" ? (
         <TriviaEditor data={trivia.data} onChange={trivia.setData} />
       ) : (
-        <DuckEditor data={duck.data} onChange={duck.setData} />
+        <div className="mx-auto w-full max-w-4xl px-6 py-8">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+            <p className="font-semibold">Ceramic Duck Hours now live on the quiz server.</p>
+            <p className="mt-1 text-sm">
+              Edit the standings from the live quiz host page (behind the host password).
+              Changes show everywhere straight away, and a finished live quiz can update the
+              ranks for you.
+            </p>
+            <a
+              href="#/live/host"
+              className="mt-3 inline-block rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-semibold text-white"
+            >
+              Open the host page
+            </a>
+          </div>
+        </div>
       )}
     </div>
   );
