@@ -119,12 +119,32 @@ export type RoomState = {
   run: SegmentRun | null;
   events: ScoreEvent[];
   qna: QnaItem[];
+  /** Game progress before each recent host step, newest last, for "back". */
+  undo?: UndoStep[];
 };
+
+/**
+ * What "back" restores: where the game was and the scores, not who's in it
+ * (players who joined since stay, and so do Q&A questions).
+ */
+export type UndoStep = {
+  phase: RoomPhase;
+  cursor: number;
+  run: SegmentRun | null;
+  events: ScoreEvent[];
+  /** When the step was taken, to give back the time that passed since. */
+  at: number;
+};
+
+/** How many presses "back" can undo in a row. */
+export const UNDO_LIMIT = 5;
 
 /** What the Durable Object should do after a state change. */
 export type Effects = {
   /** Kick off Jev judging for the current written question. */
   startJudging?: boolean;
+  /** An open arena came back via "back": carry on with its ducks where they stood. */
+  resumeArena?: { segmentId: string; pausedMs: number };
   /** Close the socket(s) for this player. */
   disconnect?: string;
 };
@@ -559,6 +579,47 @@ function openSegment(state: RoomState, index: number, now: number, seed: number)
   };
 }
 
+/** Note where the game is before a host step, so "back" can undo it. */
+function remember(state: RoomState, now: number) {
+  const step: UndoStep = structuredClone({
+    phase: state.phase,
+    cursor: state.cursor,
+    run: state.run,
+    events: state.events,
+    at: now,
+  });
+  state.undo = [...(state.undo ?? []), step].slice(-UNDO_LIMIT);
+}
+
+/**
+ * Undo the last host step (pressed too early). The clock stood still in the
+ * meantime: an open question gets back the time it had left, and answers
+ * already given keep their speed.
+ */
+function goBack(state: RoomState, now: number): Effects {
+  const step = state.undo?.pop();
+  if (!step) throw new RuleError("Nothing to go back to");
+  state.phase = step.phase;
+  state.cursor = step.cursor;
+  state.run = step.run;
+  state.events = step.events;
+  const run = state.run;
+  if (!run) return {};
+  const paused = Math.max(0, now - step.at);
+  if (run.stage === "open") {
+    run.openedAt += paused;
+    run.answersOpenAt += paused;
+    if (run.closesAt !== null) run.closesAt += paused;
+    for (const s of Object.values(run.submissions)) s.at += paused;
+  }
+  if (run.advanceAt !== null) run.advanceAt += paused;
+  const seg = currentSegment(state);
+  if (state.phase === "segment" && run.stage === "open" && seg && isArena(seg)) {
+    return { resumeArena: { segmentId: segmentId(seg), pausedMs: paused } };
+  }
+  return {};
+}
+
 /** After the read-out: show the answers, start the clock, lay out the arena for who's here now. */
 function openAnswers(state: RoomState, now: number) {
   const run = state.run;
@@ -779,6 +840,7 @@ export function hostAction(
   switch (msg.t) {
     case "advance": {
       if (state.phase === "ended") return {};
+      remember(state, ctx.now);
       if (state.phase === "lobby" || state.phase === "leaderboard") {
         // From the leaderboard, resume where we were: reveal or move on.
         if (state.run && state.run.stage !== "revealed") {
@@ -810,11 +872,15 @@ export function hostAction(
       return {};
     }
     case "close":
+      if (state.run?.stage === "open") remember(state, ctx.now);
       return closeSegment(state, ctx.judgeAvailable, ctx.now);
+    case "back":
+      return goBack(state, ctx.now);
     case "showLeaderboard":
       if (state.phase === "segment") state.phase = "leaderboard";
       return {};
     case "end":
+      if (state.phase !== "ended") remember(state, ctx.now);
       state.phase = "ended";
       if (state.run) {
         state.run.closesAt = null;
@@ -1139,6 +1205,7 @@ export function hostView(
   now: number,
   judgeConfigured: boolean,
 ): HostView {
+  const canGoBack = (state.undo?.length ?? 0) > 0;
   const s = scores(state);
   const players = Object.values(state.players)
     .filter((p) => !p.kicked)
@@ -1199,5 +1266,6 @@ export function hostView(
       }))
       .sort((a, b) => Number(a.answered) - Number(b.answered) || b.votes - a.votes),
     judgeConfigured,
+    canGoBack,
   };
 }

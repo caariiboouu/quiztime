@@ -460,9 +460,17 @@ function HostConsole({
   const setPeek = (on: boolean) => setPeekKey(on ? segKey : null);
 
   const next = nextAction(view);
+  // Space or → moves on; ← goes back a step (pressed too early). Clickers
+  // send the arrow keys, so their back button works too.
+  const canGoBack = view?.canGoBack ?? false;
   useControls(
-    { onControl: (c) => (c === "action" || c === "right") && next && send({ t: "advance" }) },
-    !!next && panel === "none",
+    {
+      onControl: (c) => {
+        if ((c === "action" || c === "right") && next) send({ t: "advance" });
+        else if (c === "left" && canGoBack) send({ t: "back" });
+      },
+    },
+    (!!next || canGoBack) && panel === "none",
   );
 
   if (status === "gone" || status === "rejected") {
@@ -601,6 +609,16 @@ function HostConsole({
                 Exit
               </button>
             </>
+          )}
+          {view.canGoBack && (
+            <button
+              type="button"
+              onClick={() => send({ t: "back" })}
+              title="Undo your last step, e.g. if you pressed too early"
+              className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-100"
+            >
+              ↶ Back <span className="font-normal opacity-70">(←)</span>
+            </button>
           )}
           {next && (
             <button

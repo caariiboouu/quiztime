@@ -356,6 +356,8 @@ export type HostSubmission = {
 
 export type HostView = {
   role: "host";
+  /** There's a step to undo with "back". */
+  canGoBack: boolean;
   code: string;
   title: string;
   serverNow: number;
@@ -383,6 +385,8 @@ export type RoomView = PlayerView | HostView;
 export type HostMessage =
   | { t: "advance" }
   | { t: "close" }
+  /** Undo the last advance, lock or end (pressed too early). */
+  | { t: "back" }
   | { t: "showLeaderboard" }
   | { t: "end" }
   | { t: "setFinalPoints"; playerId: string; points: number }

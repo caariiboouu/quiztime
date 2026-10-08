@@ -47,6 +47,7 @@ import {
   ensureDuck,
   freezeArena,
   removeDuck,
+  unfreezeArena,
   isArenaMove,
   tickArena,
   type ArenaSim,
@@ -67,6 +68,7 @@ type Attachment = { role: "host" } | { role: "player"; playerId: string };
 
 const HOST_MESSAGES = new Set<string>([
   "advance",
+  "back",
   "close",
   "showLeaderboard",
   "end",
@@ -94,6 +96,10 @@ export class Room extends DurableObject<Env> {
   private room: RoomState | null = null;
   /** The answer arena being simulated, if one is open (kept in memory only). */
   private arena: RunningArena | null = null;
+  /** The last arena that stopped, kept in case the host goes back into it. */
+  private parked: RunningArena | null = null;
+  /** Set by "back": resume the parked arena instead of starting afresh. */
+  private resume: Effects["resumeArena"] | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -320,7 +326,9 @@ export class Room extends DurableObject<Env> {
       }
     }
     this.broadcast();
+    this.resume = effects.resumeArena ?? null;
     this.syncArena();
+    this.resume = null;
     if (effects.startJudging) {
       this.ctx.waitUntil(this.runJudging());
     }
@@ -373,6 +381,7 @@ export class Room extends DurableObject<Env> {
       clearInterval(this.arena.timer);
       freezeArena(this.arena.sim);
       this.sendSnapshot(this.arena, Date.now());
+      this.parked = this.arena.segmentId === LOBBY_FEED ? null : this.arena;
       this.arena = null;
     }
     if (!want || this.arena || !room) return;
@@ -382,6 +391,17 @@ export class Room extends DurableObject<Env> {
       .sort((a, b) => (a.lookIndex ?? 0) - (b.lookIndex ?? 0))
       .map((p) => p.id);
     const now = Date.now();
+    // Back into an arena that was locked too early: everyone where they stood.
+    const parked = this.parked;
+    if (this.resume && parked && parked.segmentId === want && this.resume.segmentId === want) {
+      unfreezeArena(parked.sim, this.resume.pausedMs);
+      for (const id of ids) ensureDuck(parked.sim, id);
+      parked.last = now;
+      parked.timer = setInterval(() => this.arenaTick(), ARENA_TICK_MS);
+      this.arena = parked;
+      this.parked = null;
+      return;
+    }
     this.arena = {
       segmentId: want,
       sim: open ? createArenaSim(open.options.length, ids, open.players) : createLobbySim(ids),

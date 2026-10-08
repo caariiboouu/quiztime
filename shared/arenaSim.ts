@@ -199,6 +199,15 @@ export function freezeArena(sim: ArenaSim) {
   }
 }
 
+/**
+ * The host went back (locked too early): carry on from where everyone
+ * stood. Arrival times shift by the pause so speed scoring stays fair.
+ */
+export function unfreezeArena(sim: ArenaSim, pausedMs: number) {
+  sim.frozen = false;
+  for (const z of sim.zones.values()) z.since += pausedMs;
+}
+
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 
 export function arenaSnapshot(sim: ArenaSim): ArenaDuck[] {

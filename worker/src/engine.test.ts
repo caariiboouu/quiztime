@@ -16,6 +16,7 @@ import {
   setArenaAnswers,
   tick,
   validateSettings,
+  UNDO_LIMIT,
   validateShow,
   type RoomState,
 } from "./engine";
@@ -710,3 +711,67 @@ describe("arena by default", () => {
   });
 });
 
+
+describe("going back a step (pressed too early)", () => {
+  it("a lock pressed too early: answers reopen with the time that was left, speeds unchanged", () => {
+    const { room, t0 } = setup();
+    host(room, { t: "advance" }, t0); // q1 open, 20 s
+    answer(room, "p1", "q1", { type: "choice", optionId: "b" }, t0 + 5_000);
+    host(room, { t: "advance" }, t0 + 8_000); // lock: oops
+    expect(room.run?.stage).toBe("closed");
+    expect(hostView(room, both, t0 + 8_000, true).canGoBack).toBe(true);
+    host(room, { t: "back" }, t0 + 30_000); // 22 s later
+    expect(room.run?.stage).toBe("open");
+    // 12 s were left at the lock; still 12 s left now.
+    expect(room.run?.closesAt).toBe(t0 + 30_000 + 12_000);
+    answer(room, "p2", "q1", { type: "choice", optionId: "b" }, t0 + 31_000); // 9 s in, really
+    host(room, { t: "advance" }, t0 + 32_000);
+    host(room, { t: "advance" }, t0 + 32_000); // reveal
+    const s = scores(room);
+    expect(s.get("p1")).toBe(100 + 38); // answered 5 s in, same as without the pause
+    expect(s.get("p2")).toBe(100 + 28); // 9 s in: 50 × (1 − 9/20) ≈ 28
+  });
+
+  it("a reveal pressed too early: the points come off again", () => {
+    const { room, t0 } = setup();
+    host(room, { t: "advance" }, t0);
+    answer(room, "p1", "q1", { type: "choice", optionId: "b" }, t0 + 5_000);
+    host(room, { t: "advance" }, t0 + 6_000); // lock
+    host(room, { t: "advance" }, t0 + 7_000); // reveal
+    expect(scores(room).get("p1")).toBeGreaterThan(0);
+    host(room, { t: "back" }, t0 + 8_000);
+    expect(room.run?.stage).toBe("closed");
+    expect(scores(room).get("p1") ?? 0).toBe(0);
+  });
+
+  it("next pressed too early: back to the previous question's reveal, and newcomers stay", () => {
+    const { room, t0 } = setup();
+    host(room, { t: "advance" }, t0);
+    host(room, { t: "advance" }, t0 + 1_000); // lock
+    host(room, { t: "advance" }, t0 + 2_000); // reveal
+    host(room, { t: "advance" }, t0 + 3_000); // next: the written question
+    expect(room.cursor).toBe(1);
+    addPlayer(room, { name: "Cy", teamId: null, duckHolderId: null }, "p3", "t3", t0 + 3_500);
+    host(room, { t: "back" }, t0 + 4_000);
+    expect(room.cursor).toBe(0);
+    expect(room.run?.stage).toBe("revealed");
+    expect(room.players.p3).toBeDefined();
+  });
+
+  it("can undo a few steps in a row, then there's nothing left to undo", () => {
+    const { room, t0 } = setup();
+    host(room, { t: "advance" }, t0); // open
+    host(room, { t: "advance" }, t0 + 1); // locked
+    host(room, { t: "back" }, t0 + 2);
+    host(room, { t: "back" }, t0 + 3);
+    expect(room.phase).toBe("lobby");
+    expect(hostView(room, both, t0, true).canGoBack).toBe(false);
+    expect(() => host(room, { t: "back" }, t0 + 4)).toThrow(/Nothing to go back to/);
+  });
+
+  it("only remembers the last few steps", () => {
+    const { room, t0 } = setup();
+    for (let i = 0; i < 9; i++) host(room, { t: "advance" }, t0 + i);
+    expect(room.undo).toHaveLength(UNDO_LIMIT);
+  });
+});
