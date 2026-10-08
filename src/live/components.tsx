@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type {
   ChoiceOption,
   PublicPlayer,
@@ -7,6 +7,9 @@ import type {
   TeamStanding,
 } from "../../shared/protocol";
 import { ARROW, useControls, type Control } from "./controls";
+import { DuckAvatar } from "./mascot/DuckAvatar";
+import { duckHoursLeader } from "./mascot/duckChampion";
+import { lookFor } from "./mascot/variants";
 
 /**
  * Answer options mapped onto directions, so every answer is one keypress
@@ -170,6 +173,7 @@ export function Leaderboard({
   limit?: number;
 }) {
   const teamById = new Map(teams.map((t) => [t.id, t]));
+  const leader = useMemo(() => duckHoursLeader(), []);
   const top = players.slice(0, limit);
   const me = highlightId ? players.findIndex((p) => p.id === highlightId) : -1;
   return (
@@ -182,6 +186,7 @@ export function Leaderboard({
             player={p}
             team={p.teamId ? teamById.get(p.teamId) : undefined}
             highlight={p.id === highlightId}
+            crowned={p.duckHolderId !== null && p.duckHolderId === leader}
           />
         ))}
         {me >= limit && (
@@ -190,6 +195,7 @@ export function Leaderboard({
             player={players[me]}
             team={players[me].teamId ? teamById.get(players[me].teamId!) : undefined}
             highlight
+            crowned={players[me].duckHolderId !== null && players[me].duckHolderId === leader}
           />
         )}
         {players.length === 0 && (
@@ -228,11 +234,13 @@ function PlayerRow({
   player,
   team,
   highlight,
+  crowned,
 }: {
   rank: number;
   player: PublicPlayer;
   team?: TeamStanding;
   highlight?: boolean;
+  crowned?: boolean;
 }) {
   return (
     <li
@@ -241,6 +249,12 @@ function PlayerRow({
       }`}
     >
       <span className="w-6 text-center font-semibold tabular-nums text-neutral-400">{rank}</span>
+      <DuckAvatar
+        look={lookFor(player.lookIndex, player.outfit)}
+        crowned={crowned}
+        size={rank <= 3 ? 48 : 40}
+        label={`${player.name}'s duck`}
+      />
       {team && (
         <span
           className="h-4 w-4 shrink-0 rounded-full"

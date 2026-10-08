@@ -36,6 +36,8 @@ import {
 import { useControls } from "./controls";
 import { Mascot } from "./mascot/Mascot";
 import { PinResets } from "./account/PinResets";
+import { lookFor } from "./mascot/variants";
+import { duckHoursLeader } from "./mascot/duckChampion";
 import { QuestionEditor } from "./host/QuestionEditor";
 import { showProblems } from "./host/questionSet";
 import { hasWebGL } from "./minigames/three/fallbackContext";
@@ -715,12 +717,27 @@ function HostStage({
   }
 
   if (view.phase === "leaderboard" || view.phase === "ended") {
+    // Whoever's in front: their own duck takes the stage (the mascot until
+    // anyone has points).
+    const top = view.players[0]?.score > 0 ? view.players[0] : null;
+    const topCrowned = top?.duckHolderId != null && top.duckHolderId === duckHoursLeader();
     return (
       <div className="space-y-8">
-        <Mascot animation={view.phase === "ended" ? "celebrate" : "waddle"} size={190} className="-mb-6" />
+        <Mascot
+          animation={view.phase === "ended" ? "celebrate" : "waddle"}
+          look={top ? lookFor(top.lookIndex, top.outfit) : undefined}
+          crowned={topCrowned}
+          size={190}
+          className="-mb-6"
+        />
         <h2 className="text-center text-4xl font-black">
           {view.phase === "ended" ? "🏆 Final standings" : "Leaderboard"}
         </h2>
+        {top && (
+          <p className="-mt-6 text-center text-lg font-semibold text-neutral-600">
+            {view.phase === "ended" ? `${top.name} wins!` : `${top.name} is in the lead`}
+          </p>
+        )}
         <Leaderboard players={view.players} teams={view.teams} teamMode={view.settings.teamMode} />
         {view.phase === "ended" && <DuckBonusPanel view={view} />}
       </div>
