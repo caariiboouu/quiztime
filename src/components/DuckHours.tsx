@@ -127,6 +127,8 @@ export function DuckHours({ onExit }: DuckHoursProps) {
       holding: h.rank === 1,
       total: formatDuration(liveSeconds(data, h.id, now), h.rank !== null && anyRunning),
       rate: rateText(h.rank),
+      rateShort: h.rank === 1 ? "holding · 1×" : h.rank ? `${ordinal(h.rank)} · ${fractionLabel(h.rank)}` : "benched",
+      benched: h.rank === null,
     };
   });
   const chosen = entries.find((e) => e.id === selected);

@@ -36,6 +36,10 @@ export type BoardEntry = {
   total: string;
   /** "½× rate", "holds the duck", "benched". */
   rate: string;
+  /** The same, short, for tags: "holding · 1×", "2nd · ½×", "benched". */
+  rateShort: string;
+  /** No rank: earning nothing until they play again. */
+  benched: boolean;
 };
 
 /** Gaps between ducks on the board (world units; a duck is ~1.3 long). */
@@ -137,8 +141,8 @@ export default function DuckBoardScene({
               else tagRefs.current.delete(e.id);
             }}
             onClick={() => onSelect(e.id)}
-            aria-label={`${e.name}: ${e.place}${e.place === 1 ? "st" : e.place === 2 ? "nd" : e.place === 3 ? "rd" : "th"}, ${e.total}${e.holding ? ", holds the duck" : ""}`}
-            className={`pointer-events-auto absolute left-0 top-0 max-w-[30%] rounded-lg border px-1.5 py-0.5 text-center shadow-sm backdrop-blur-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 sm:max-w-[11rem] sm:px-2 ${
+            aria-label={`${e.name}: place ${e.place}, ${e.total}, ${e.rate}`}
+            className={`pointer-events-auto absolute left-0 top-0 max-w-[30%] rounded-lg border px-1.5 py-0.5 text-center shadow-sm backdrop-blur-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 sm:max-w-[11rem] sm:px-2 ${e.benched ? "opacity-80" : ""} ${
               e.holding ? "border-amber-400 bg-amber-50/95" : "border-white/70 bg-white/85"
             } ${e.id === meId ? "ring-2 ring-amber-400" : ""}`}
             style={{ visibility: "hidden" }}
@@ -151,6 +155,7 @@ export default function DuckBoardScene({
             <span className="block truncate font-mono text-[10px] leading-tight text-neutral-600 sm:text-xs">
               {e.total}
             </span>
+            <RateChip entry={e} />
           </button>
         ))}
       </div>
@@ -174,6 +179,23 @@ function BoardCamera({ zoom, zCenter, lift }: { zoom: number; zCenter: number; l
     camera.updateProjectionMatrix();
   }, [get, size, zoom, zCenter, lift]);
   return null;
+}
+
+/** How fast they're earning: holding the duck, a fraction, or benched. */
+export function RateChip({ entry }: { entry: BoardEntry }) {
+  return (
+    <span
+      className={`mt-0.5 inline-block max-w-full truncate rounded-full px-1.5 text-[9px] font-semibold leading-snug sm:text-[11px] ${
+        entry.holding
+          ? "bg-amber-200 text-amber-900"
+          : entry.benched
+            ? "bg-neutral-200 text-neutral-500"
+            : "bg-emerald-100 text-emerald-900"
+      }`}
+    >
+      {entry.rateShort}
+    </span>
+  );
 }
 
 function Board({

@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import SideStage from "../sideview/SideStage";
-import type { BoardEntry } from "./DuckBoardScene";
+import { RateChip, type BoardEntry } from "./DuckBoardScene";
 import { shelfColumns, shelfLayout } from "./shelfLayout";
 
 /**
@@ -58,7 +58,7 @@ export default function ShelfBoard({
         onSelect={onSelect}
         tagLabel={(id) => {
           const e = byId.get(id);
-          return e ? `${e.name}: place ${e.place}, ${e.total}${e.holding ? ", holds the duck" : ""}` : "";
+          return e ? `${e.name}: place ${e.place}, ${e.total}, ${e.rate}` : "";
         }}
         renderTag={(id) => {
           const e = byId.get(id);
@@ -67,7 +67,7 @@ export default function ShelfBoard({
             <span
               className={`block max-w-[6.5rem] rounded-md border px-1 py-px text-center shadow-sm sm:max-w-[9rem] sm:px-1.5 sm:py-0.5 ${
                 e.holding ? "border-amber-400 bg-amber-50" : "border-white/70 bg-white/90"
-              } ${id === meId ? "ring-2 ring-amber-400" : ""}`}
+              } ${id === meId ? "ring-2 ring-amber-400" : ""} ${e.benched ? "opacity-80" : ""}`}
             >
               <span className="block truncate text-[10px] font-bold leading-tight text-neutral-900 sm:text-[13px]">
                 <span className="text-neutral-400">{e.place}</span> {e.name}
@@ -77,6 +77,7 @@ export default function ShelfBoard({
               <span className="block truncate font-mono text-[9px] leading-tight text-neutral-600 sm:text-[11px]">
                 {e.total}
               </span>
+              <RateChip entry={e} />
             </span>
           );
         }}
