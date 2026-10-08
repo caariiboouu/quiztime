@@ -202,6 +202,19 @@ npm run dev          # http://localhost:5173/quiztime/#/live/host
 npm test
 ```
 
+## Questions
+
+The host page asks for the host password first, then shows the saved
+question set (the `Library` Durable Object, `worker/src/library.ts`): every
+game starts with it until it's changed. Edit questions, answers (2–4; tick the
+right one), points and seconds; add, remove and reorder questions; import a
+show file or download a backup. "Create room" saves any edits first. Loading
+or saving the set (answers included) needs the host password
+(`POST /api/show/load`, `POST /api/show/save`); the server checks a set with
+the same rules as a show file before saving it. Minigames, lightning rounds
+and typed questions come from show files; in the editor they can be moved or
+removed. Keep real sets out of the repo (`shows/` is git-ignored).
+
 ## Deploying
 
 1. `npx wrangler login`

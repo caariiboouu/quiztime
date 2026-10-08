@@ -4,6 +4,8 @@ import type {
   AccountSession,
   CreateAccountRequest,
   CreateRoomRequest,
+  SavedShow,
+  Show,
   CreateRoomResponse,
   JoinRequest,
   JoinResponse,
@@ -56,6 +58,14 @@ export const joinRoom = (code: string, req: JoinRequest) =>
     method: "POST",
     body: JSON.stringify(req),
   });
+
+/** The saved question set, answers and all (host password needed). */
+export const loadSavedShow = (password: string) =>
+  call<SavedShow>("/api/show/load", { method: "POST", body: JSON.stringify({ password }) });
+
+/** Replace the saved question set: every new game starts with it. */
+export const saveSavedShow = (password: string, show: Show) =>
+  call<SavedShow>("/api/show/save", { method: "POST", body: JSON.stringify({ password, show }) });
 
 export const listAccounts = () => call<AccountList>("/api/accounts");
 

@@ -11,22 +11,28 @@
  *   POST /api/accounts           claim a Duck Hours entry or add someone new (+ PIN)
  *   POST /api/accounts/:id/login sign in on this device with the PIN
  *   POST /api/accounts/:id/reset host resets a forgotten PIN (needs HOST_PASSWORD)
+ *   POST /api/show/load          the saved question set, answers and all (needs HOST_PASSWORD)
+ *   POST /api/show/save          replace the saved question set (needs HOST_PASSWORD)
  */
 import type {
   CreateAccountRequest,
   CreateRoomRequest,
   CreateRoomResponse,
   JoinRequest,
+  LoadShowRequest,
   LoginRequest,
   ResetPinRequest,
+  SaveShowRequest,
+  Show,
 } from "../../shared/protocol";
 import { Accounts, accountsStub } from "./accounts";
+import { Library, libraryStub } from "./library";
 import { validateSettings, validateShow } from "./engine";
 import { Demo } from "./demo";
 import { Room } from "./room";
 import { randomToken, timingSafeEqual } from "./secrets";
 
-export { Accounts, Demo, Room };
+export { Accounts, Demo, Library, Room };
 
 export interface Env {
   ROOMS: DurableObjectNamespace<Room>;
@@ -34,6 +40,8 @@ export interface Env {
   DEMO: DurableObjectNamespace<Demo>;
   /** Everyone's accounts (one object). */
   ACCOUNTS: DurableObjectNamespace<Accounts>;
+  /** The host's saved question set (one object). */
+  LIBRARY: DurableObjectNamespace<Library>;
   /** Secret: password the host types to create a room. */
   HOST_PASSWORD: string;
   /** Secret: TypeSafe API key for Jev. Without it, written answers are hand-scored. */
@@ -110,6 +118,19 @@ export default {
     }
     if (url.pathname === "/api/demo/stats" && request.method === "GET") {
       return json(await env.DEMO.get(env.DEMO.idFromName("demo")).getStats(), 200, origin);
+    }
+
+    if ((url.pathname === "/api/show/load" || url.pathname === "/api/show/save") && request.method === "POST") {
+      const body = await readJson<LoadShowRequest & Partial<SaveShowRequest>>(request);
+      if (!body) return json({ error: "Invalid JSON" }, 400, origin);
+      if (!env.HOST_PASSWORD || !timingSafeEqual(String(body.password ?? ""), env.HOST_PASSWORD)) {
+        return json({ error: "Wrong host password" }, 401, origin);
+      }
+      const library = libraryStub(env);
+      if (url.pathname === "/api/show/load") return json(await library.load(), 200, origin);
+      const problem = validateShow(body.show);
+      if (problem) return json({ error: problem }, 400, origin);
+      return json(await library.save(body.show as Show, Date.now()), 200, origin);
     }
 
     if (url.pathname.startsWith("/api/accounts")) {

@@ -7,7 +7,8 @@
     "bindings": [
       { "name": "ROOMS", "class_name": "Room" },
       { "name": "DEMO", "class_name": "Demo" },
-      { "name": "ACCOUNTS", "class_name": "Accounts" }
+      { "name": "ACCOUNTS", "class_name": "Accounts" },
+      { "name": "LIBRARY", "class_name": "Library" }
     ]
   },
   // Workers Logs: every console.log/error is kept for a few days in the
@@ -16,7 +17,8 @@
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["Room"] },
     { "tag": "v2", "new_sqlite_classes": ["Demo"] },
-    { "tag": "v3", "new_sqlite_classes": ["Accounts"] }
+    { "tag": "v3", "new_sqlite_classes": ["Accounts"] },
+    { "tag": "v4", "new_sqlite_classes": ["Library"] }
   ],
   "vars": {
     // Official TypeSafe endpoint (https://docs.typesafe.ai/api).

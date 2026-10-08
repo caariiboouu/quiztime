@@ -455,6 +455,15 @@ export type AccountSession = { account: Account; token: string };
 /** The host resets a forgotten PIN; the player sets a new one next time. */
 export type ResetPinRequest = { password: string };
 
+// ---------------------------------------------------------------------------
+// The host's saved question set (behind the host password)
+// ---------------------------------------------------------------------------
+
+/** The question set every new game starts with, until the host edits it. */
+export type SavedShow = { show: Show | null; updatedAt: number | null };
+export type LoadShowRequest = { password: string };
+export type SaveShowRequest = { password: string; show: Show };
+
 export const PIN_RE = /^\d{4}$/;
 /** Wrong PINs in a row before an account locks for a while. */
 export const PIN_TRIES = 5;

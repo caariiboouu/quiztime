@@ -32,3 +32,6 @@ dist-ssr
 # Cloudflare Worker local state and secrets
 .wrangler/
 worker/.dev.vars
+
+# Real quiz shows (answers included): load them at game time, never publish.
+shows/

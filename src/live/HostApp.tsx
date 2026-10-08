@@ -5,6 +5,7 @@ import type {
   HostSubmission,
   HostView,
   RoomSettings,
+  SavedShow,
   ScoringMode,
   Segment,
   Show,
@@ -16,7 +17,9 @@ import {
   createRoom,
   joinLink,
   loadHostCreds,
+  loadSavedShow,
   saveHostCreds,
+  saveSavedShow,
   type HostCreds,
 } from "./api";
 import {
@@ -33,6 +36,8 @@ import {
 import { useControls } from "./controls";
 import { Mascot } from "./mascot/Mascot";
 import { PinResets } from "./account/PinResets";
+import { QuestionEditor } from "./host/QuestionEditor";
+import { showProblems } from "./host/questionSet";
 import { hasWebGL } from "./minigames/three/fallbackContext";
 import { MINIGAMES } from "./minigames";
 import { useRoom, useServerNow, type ArenaFeed } from "./useRoom";
@@ -82,33 +87,84 @@ function HostSetup({
   onExit: () => void;
 }) {
   const [password, setPassword] = useState("");
-  const [show, setShow] = useState<Show>(sampleShow as Show);
-  const [showSource, setShowSource] = useState("Sample show");
+  // The saved question set (from the server) and the copy being edited.
+  const [saved, setSaved] = useState<SavedShow | null>(null);
+  const [draft, setDraft] = useState<Show>(sampleShow as Show);
   const [teamMode, setTeamMode] = useState(false);
   const [teams, setTeams] = useState<Team[]>(DEFAULT_TEAMS);
   const [choiceScoring, setChoiceScoring] = useState<ScoringMode>("accuracy");
   const [speedBonusMax, setSpeedBonusMax] = useState(50);
   const [arena, setArena] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"unlock" | "save" | "create" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const loadFile = async (file: File) => {
+  const dirty = saved !== null && JSON.stringify(draft) !== JSON.stringify(saved.show);
+  const problems = showProblems(draft);
+
+  const unlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy("unlock");
+    setError(null);
+    try {
+      const res = await loadSavedShow(password);
+      setSaved(res);
+      // Nothing saved yet: start from the sample.
+      setDraft(res.show ?? (sampleShow as Show));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Save the edited set; returns it, or null if the server refused. */
+  const saveDraft = async (): Promise<Show | null> => {
+    setBusy("save");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await saveSavedShow(password, draft);
+      setSaved(res);
+      setNotice("Saved. Every new game starts with these questions.");
+      return res.show;
+    } catch (err) {
+      setError((err as Error).message);
+      return null;
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const importFile = async (file: File) => {
     setError(null);
     try {
       const parsed = JSON.parse(await file.text()) as Show;
       if (!parsed?.title || !Array.isArray(parsed.segments)) {
         throw new Error("That file isn't a show (needs a title and segments).");
       }
-      setShow(parsed);
-      setShowSource(file.name);
+      setDraft(parsed);
+      setNotice(`Loaded ${file.name}. Save to use it for every new game.`);
     } catch (err) {
       setError(err instanceof SyntaxError ? "That file isn't valid JSON." : (err as Error).message);
     }
   };
 
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(draft, null, 2)], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${draft.title.replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "questions"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBusy(true);
+    // A game always starts from the saved set: save any edits first.
+    const show = dirty ? await saveDraft() : saved?.show;
+    if (!show) return;
+    setBusy("create");
     setError(null);
     const settings: RoomSettings = {
       teamMode,
@@ -123,61 +179,104 @@ function HostSetup({
     } catch (err) {
       setError((err as Error).message);
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
+  const header = (
+    <header className="flex items-center justify-between border-b border-neutral-200 bg-white px-6 py-4">
+      <h1 className="text-xl font-semibold">Host a live quiz</h1>
+      <button type="button" onClick={onExit} className="text-sm text-neutral-500 underline">
+        Back
+      </button>
+    </header>
+  );
+
+  // Everything here (answers included) is behind the host password.
+  if (!saved) {
+    return (
+      <div className="min-h-full bg-neutral-50">
+        {header}
+        <form onSubmit={unlock} className="mx-auto max-w-sm space-y-4 px-6 py-12">
+          <label className="block">
+            <span className="mb-1 block text-lg font-semibold">Host password</span>
+            <input
+              type="password"
+              required
+              autoFocus
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2"
+            />
+          </label>
+          {error && <Banner kind="error">{error}</Banner>}
+          <button
+            type="submit"
+            disabled={busy !== null || !password}
+            className="w-full rounded-xl bg-neutral-900 py-3 font-bold text-white disabled:opacity-40"
+          >
+            {busy === "unlock" ? "Checking…" : "Unlock"}
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-full bg-neutral-50">
-      <header className="flex items-center justify-between border-b border-neutral-200 bg-white px-6 py-4">
-        <h1 className="text-xl font-semibold">Host a live quiz</h1>
-        <button type="button" onClick={onExit} className="text-sm text-neutral-500 underline">
-          Back
-        </button>
-      </header>
+      {header}
       <form onSubmit={submit} className="mx-auto max-w-2xl space-y-8 px-6 py-8">
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold">Show</h2>
-          <div className="rounded-xl border border-neutral-200 bg-white p-4">
-            <p className="font-semibold">{show.title}</p>
-            <p className="text-sm text-neutral-500">
-              {showSource} · {show.segments.length} segments
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-lg font-semibold">Questions</h2>
+            <p className={`text-sm ${dirty ? "font-semibold text-amber-700" : "text-neutral-500"}`}>
+              {dirty
+                ? "Unsaved changes"
+                : saved.updatedAt
+                  ? `Saved ${new Date(saved.updatedAt).toLocaleString()}`
+                  : "Not saved yet"}
             </p>
-            <ol className="mt-3 space-y-1 text-sm text-neutral-700">
-              {show.segments.map((s, i) => (
-                <li key={i} className="truncate">
-                  {i + 1}. {segmentLabel(s)}
-                </li>
-              ))}
-            </ol>
           </div>
+          <p className="text-sm text-neutral-600">
+            Every game you start uses this set until you change it.
+          </p>
+          <QuestionEditor show={draft} onChange={setDraft} label={segmentLabel} />
+          {dirty && problems.length > 0 && (
+            <ul className="list-inside list-disc text-sm text-amber-800">
+              {problems.slice(0, 5).map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          )}
           <div className="flex flex-wrap items-center gap-3 text-sm">
+            <button
+              type="button"
+              onClick={() => void saveDraft()}
+              disabled={!dirty || problems.length > 0 || busy !== null}
+              className="rounded-md bg-neutral-900 px-4 py-2 font-semibold text-white disabled:opacity-40"
+            >
+              {busy === "save" ? "Saving…" : "Save questions"}
+            </button>
+            {dirty && saved.show && (
+              <button type="button" onClick={() => setDraft(saved.show!)} className="text-neutral-600 underline">
+                Discard changes
+              </button>
+            )}
             <label className="cursor-pointer rounded-md border border-neutral-300 bg-white px-3 py-1.5 font-medium hover:bg-neutral-100">
-              Load show file…
+              Import a show file…
               <input
                 type="file"
                 accept="application/json,.json"
                 className="sr-only"
-                onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])}
+                onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])}
               />
             </label>
-            {showSource !== "Sample show" && (
-              <button
-                type="button"
-                className="text-neutral-600 underline"
-                onClick={() => {
-                  setShow(sampleShow as Show);
-                  setShowSource("Sample show");
-                }}
-              >
-                Use the sample instead
-              </button>
-            )}
+            <button type="button" onClick={download} className="text-neutral-600 underline">
+              Download a backup
+            </button>
           </div>
-          <p className="text-xs text-neutral-500">
-            Keep real shows out of the public repo: everything in the site bundle (including the
-            sample) is readable by players, answers included. Load them from a file at game time.
-          </p>
+          {notice && !dirty && <Banner kind="info">{notice}</Banner>}
         </section>
 
         <section className="space-y-3">
@@ -309,28 +408,14 @@ function HostSetup({
           )}
         </section>
 
-        <section className="space-y-3">
-          <label className="block">
-            <span className="mb-1 block text-lg font-semibold">Host password</span>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-              className="w-full rounded-md border border-neutral-300 px-3 py-2"
-            />
-          </label>
-        </section>
-
         {error && <Banner kind="error">{error}</Banner>}
 
         <button
           type="submit"
-          disabled={busy || !password}
+          disabled={busy !== null || problems.length > 0}
           className="w-full rounded-xl bg-amber-500 py-4 text-lg font-bold text-white shadow hover:brightness-110 disabled:opacity-40"
         >
-          {busy ? "Creating…" : "Create room"}
+          {busy === "create" ? "Creating…" : dirty ? "Save questions and create room" : "Create room"}
         </button>
       </form>
       <div className="mx-auto max-w-2xl px-6 pb-10">
