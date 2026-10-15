@@ -51,6 +51,7 @@ import {
 import { cleanOutfit, type DuckOutfit } from "../../shared/outfit";
 import { ranksFromScores } from "../../shared/duckStandings";
 import { addCall, NO_SPEND, sumSpend, type JevCall, type JevSpend } from "../../shared/jevCost";
+import { gameKey, type JevLedgerSummary } from "../../shared/jevLedger";
 import {
   levelPoints,
   numericAwards,
@@ -1456,6 +1457,8 @@ export function hostView(
   connected: Set<string>,
   now: number,
   judgeConfigured: boolean,
+  /** All-time Jev spend, kept outside the room (null while it's loading). */
+  allTime: JevLedgerSummary | null = null,
 ): HostView {
   const canGoBack = (state.undo?.length ?? 0) > 0;
   const s = scores(state);
@@ -1535,6 +1538,8 @@ export function hostView(
       return {
         question: seg ? (bySeg[segmentId(seg)] ?? null) : null,
         game: sumSpend(Object.values(bySeg)),
+        allTime,
+        gameKey: gameKey(state.code, state.createdAt),
       };
     })(),
     canGoBack,

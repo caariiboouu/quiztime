@@ -1,6 +1,7 @@
 import type { ArenaDuck, ArenaMove } from "./arenaSim";
 import type { DuckOutfit } from "./outfit";
 import type { JevSpend } from "./jevCost";
+import type { JevLedgerSummary } from "./jevLedger";
 
 /**
  * Wire protocol and data model for the online ("live") quiz, shared by the
@@ -448,8 +449,17 @@ export type HostView = {
   segments: { id: string; label: string }[];
   qna: (PublicQna & { hidden: boolean })[];
   judgeConfigured: boolean;
-  /** What Jev has cost: this question so far, and the whole game. Host only. */
-  jevSpend: { question: JevSpend | null; game: JevSpend };
+  /**
+   * What Jev has cost: this question so far, the whole game, and every game
+   * the server remembers (null until it's loaded). Host only.
+   */
+  jevSpend: {
+    question: JevSpend | null;
+    game: JevSpend;
+    allTime: JevLedgerSummary | null;
+    /** This game's key in `allTime.recent`. */
+    gameKey: string;
+  };
 };
 
 export type RoomView = PlayerView | HostView;

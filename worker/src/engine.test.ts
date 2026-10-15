@@ -24,6 +24,8 @@ import {
   validateShow,
   type RoomState,
 } from "./engine";
+import { addCall, NO_SPEND } from "../../shared/jevCost";
+import { EMPTY_LEDGER, ledgerSummary, recordGame } from "../../shared/jevLedger";
 
 const SHOW: Show = {
   title: "Test show",
@@ -891,7 +893,12 @@ describe("debate question", () => {
     const { room, t0 } = open();
     const call = { model: "jev-1.13.0", inputTokens: 1000, outputTokens: 20 };
     const spend = () => hostView(room, both, t0, true).jevSpend;
-    expect(spend()).toEqual({ question: null, game: { calls: 0, inputTokens: 0, outputTokens: 0, usd: 0, unpriced: 0 } });
+    expect(spend()).toEqual({
+      question: null,
+      game: { calls: 0, inputTokens: 0, outputTokens: 0, usd: 0, unpriced: 0 },
+      allTime: null,
+      gameKey: `${room.code}-${room.createdAt}`,
+    });
 
     answer(room, "p1", "d1", { type: "debate", side: "for", text: "Ducks are calmer" }, t0);
     answer(room, "p2", "d1", { type: "debate", side: "against", text: "Geese guard farms" }, t0);
@@ -922,6 +929,18 @@ describe("debate question", () => {
     const pv = JSON.stringify(playerView(room, "p1", both, t0));
     expect(pv).not.toContain("jevSpend");
     expect(pv).not.toContain("inputTokens");
+  });
+
+  it("shows the host the all-time Jev spend it's given, and players never", () => {
+    const { room, t0 } = open();
+    const spend = addCall(NO_SPEND, { model: "jev-1.13.0", inputTokens: 1000, outputTokens: 20 });
+    const ledger = ledgerSummary(
+      recordGame(EMPTY_LEDGER, { key: "OLDS-1", code: "OLDS", title: "Last week's show", startedAt: 1, spend }),
+    );
+    expect(hostView(room, both, t0, true, ledger).jevSpend.allTime).toEqual(ledger);
+    const pv = JSON.stringify(playerView(room, "p1", both, t0));
+    expect(pv).not.toContain("allTime");
+    expect(pv).not.toContain("Last week's show");
   });
 });
 

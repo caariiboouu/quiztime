@@ -9,7 +9,8 @@
       { "name": "DEMO", "class_name": "Demo" },
       { "name": "ACCOUNTS", "class_name": "Accounts" },
       { "name": "LIBRARY", "class_name": "Library" },
-      { "name": "STANDINGS", "class_name": "Standings" }
+      { "name": "STANDINGS", "class_name": "Standings" },
+      { "name": "JEV_LEDGER", "class_name": "JevLedger" }
     ]
   },
   // Workers Logs: every console.log/error is kept for a few days in the
@@ -20,7 +21,8 @@
     { "tag": "v2", "new_sqlite_classes": ["Demo"] },
     { "tag": "v3", "new_sqlite_classes": ["Accounts"] },
     { "tag": "v4", "new_sqlite_classes": ["Library"] },
-    { "tag": "v5", "new_sqlite_classes": ["Standings"] }
+    { "tag": "v5", "new_sqlite_classes": ["Standings"] },
+    { "tag": "v6", "new_sqlite_classes": ["JevLedger"] }
   ],
   "vars": {
     // Official TypeSafe endpoint (https://docs.typesafe.ai/api).

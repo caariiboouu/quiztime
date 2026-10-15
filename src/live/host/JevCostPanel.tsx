@@ -1,9 +1,10 @@
 import { formatTokens, formatUsd, JEV_USD_PER_MTOK_INPUT, type JevSpend } from "../../../shared/jevCost";
+import type { JevLedgerSummary } from "../../../shared/jevLedger";
 import type { HostView } from "../../../shared/protocol";
 
-/** What judging with Jev has cost: this question, and the whole game. Host only. */
+/** What judging with Jev has cost: this question, the whole game, and all time. Host only. */
 export function JevCostPanel({ view }: { view: HostView }) {
-  const { question, game } = view.jevSpend;
+  const { question, game, allTime } = view.jevSpend;
   const price = Object.values(JEV_USD_PER_MTOK_INPUT)[0];
   return (
     <div className="space-y-4">
@@ -13,6 +14,7 @@ export function JevCostPanel({ view }: { view: HostView }) {
       )}
       <SpendBlock title="This question" spend={question} />
       <SpendBlock title="This game" spend={game} />
+      <AllTime ledger={allTime} thisGame={view.jevSpend.gameKey} />
       <p className="text-xs text-neutral-500">
         Jev bills input tokens only (${price} per million); output tokens are free. Each written answer or argument is
         one call, and re-judging pays again. Counts every call Jev answered, as it reported them.
@@ -49,5 +51,51 @@ function SpendBlock({ title, spend }: { title: string; spend: JevSpend | null })
         </>
       )}
     </section>
+  );
+}
+
+const dateFormat = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
+
+/** Every game the server remembers, and the last few one by one. */
+function AllTime({ ledger, thisGame }: { ledger: JevLedgerSummary | null; thisGame: string }) {
+  if (!ledger) {
+    return (
+      <section className="rounded-lg border border-neutral-200 p-3">
+        <h3 className="text-sm font-semibold text-neutral-600">All time</h3>
+        <p className="mt-1 text-sm text-neutral-500">Loading…</p>
+      </section>
+    );
+  }
+  return (
+    <>
+      <SpendBlock
+        title={
+          ledger.since
+            ? `All time: ${ledger.games} ${ledger.games === 1 ? "game" : "games"} since ${dateFormat.format(ledger.since)}`
+            : "All time"
+        }
+        spend={ledger.total}
+      />
+      {ledger.recent.length > 0 && (
+        <section className="rounded-lg border border-neutral-200 p-3">
+          <h3 className="text-sm font-semibold text-neutral-600">Recent games</h3>
+          <ul className="mt-1 divide-y divide-neutral-100 text-sm">
+            {ledger.recent.map((g) => (
+              <li key={g.key} className="flex items-baseline gap-2 py-1.5">
+                <span className="w-24 shrink-0 text-neutral-500 tabular-nums">{dateFormat.format(g.startedAt)}</span>
+                <span className="min-w-0 flex-1 truncate" title={g.title}>
+                  {g.title}
+                  {g.key === thisGame && <span className="ml-1 text-xs text-neutral-500">(this game)</span>}
+                </span>
+                <span className="shrink-0 tabular-nums">
+                  {formatUsd(g.spend.usd)}
+                  {g.spend.unpriced > 0 ? "+" : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
   );
 }

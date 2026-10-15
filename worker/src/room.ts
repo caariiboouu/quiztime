@@ -58,6 +58,9 @@ import {
 } from "../../shared/arenaSim";
 import { accountsStub } from "./accounts";
 import { standingsStub } from "./standings";
+import { jevLedgerStub } from "./jevLedger";
+import { sumSpend } from "../../shared/jevCost";
+import { gameKey, type JevLedgerSummary } from "../../shared/jevLedger";
 import type { Env } from "./index";
 import { randomToken, timingSafeEqual } from "./secrets";
 import { logEvent } from "./log";
@@ -109,6 +112,9 @@ export class Room extends DurableObject<Env> {
   private parked: RunningArena | null = null;
   /** Set by "back": resume the parked arena instead of starting afresh. */
   private resume: Effects["resumeArena"] | null = null;
+  /** All-time Jev spend for the host's view (not stored here: it'd go stale). */
+  private jevLedger: JevLedgerSummary | null = null;
+  private jevLedgerAsked = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -386,16 +392,55 @@ export class Room extends DurableObject<Env> {
         if (this.room) recordJevUsage(this.room, segId, call);
       },
     };
-    await judgeAll(cfg, question, items, async (playerId, result) => {
+    try {
+      await judgeAll(cfg, question, items, async (playerId, result) => {
+        if (!this.room) return;
+        applyJudgeResult(this.room, segId, playerId, result);
+        await this.save();
+        this.broadcast();
+      });
       if (!this.room) return;
-      applyJudgeResult(this.room, segId, playerId, result);
+      finishJudging(this.room, segId);
       await this.save();
       this.broadcast();
-    });
-    if (!this.room) return;
-    finishJudging(this.room, segId);
-    await this.save();
-    this.broadcast();
+    } finally {
+      await this.recordJevSpend(room);
+    }
+  }
+
+  /** Tell the all-time ledger this game's whole Jev spend so far. */
+  private async recordJevSpend(room: RoomState) {
+    const spend = sumSpend(Object.values(room.jevSpend ?? {}));
+    if (spend.calls === 0) return;
+    try {
+      this.jevLedger = await jevLedgerStub(this.env).record({
+        key: gameKey(room.code, room.createdAt),
+        code: room.code,
+        title: room.title,
+        startedAt: room.createdAt,
+        spend,
+      });
+      this.broadcast();
+    } catch (err) {
+      logEvent("jev_ledger_error", { code: room.code, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  /** Fetch the all-time Jev spend once, for a host who's watching. */
+  private loadJevLedger() {
+    if (this.jevLedgerAsked) return;
+    this.jevLedgerAsked = true;
+    this.ctx.waitUntil(
+      jevLedgerStub(this.env)
+        .summary()
+        .then((summary) => {
+          this.jevLedger ??= summary;
+          this.broadcast();
+        })
+        .catch((err) => {
+          logEvent("jev_ledger_error", { error: err instanceof Error ? err.message : String(err) });
+        }),
+    );
   }
 
   /**
@@ -573,9 +618,10 @@ export class Room extends DurableObject<Env> {
       if (ws.readyState !== WebSocket.OPEN) continue;
       const a = ws.deserializeAttachment() as Attachment;
       if (a.role === "host") {
+        if (!this.jevLedger) this.loadJevLedger();
         hostPayload ??= JSON.stringify({
           t: "state",
-          view: hostView(room, connected, now, this.judgeAvailable),
+          view: hostView(room, connected, now, this.judgeAvailable, this.jevLedger),
         } satisfies ServerMessage);
         ws.send(hostPayload);
       } else {

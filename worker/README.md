@@ -175,6 +175,8 @@ arrive once its connections close.
 | `worker/src/demo.ts` | Durable Object: the shared practice arena |
 | `worker/src/accounts.ts` | Durable Object: player accounts, PINs, saved outfits |
 | `worker/src/jev.ts` | Jev judging (composite rubric scoring) |
+| `shared/jevCost.ts`, `shared/jevLedger.ts` | What Jev costs: price table, per-game and all-time totals |
+| `worker/src/jevLedger.ts` | Durable Object: all-time Jev spend and recent games (host only) |
 | `src/live/` | Host console/presenter screen and player app |
 
 Routes: `#/live` (enter code), `#/live/join/ABCD`, `#/live/host`,

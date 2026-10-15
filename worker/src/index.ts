@@ -34,6 +34,7 @@ import type {
 import { Accounts, accountsStub } from "./accounts";
 import { Library, libraryStub } from "./library";
 import { Standings, standingsStub } from "./standings";
+import { JevLedger } from "./jevLedger";
 import { standingsError } from "../../shared/duckStandings";
 import { cleanOutfit } from "../../shared/outfit";
 import type { DuckHoursData } from "../../src/types";
@@ -42,7 +43,7 @@ import { Demo } from "./demo";
 import { Room } from "./room";
 import { randomToken, timingSafeEqual } from "./secrets";
 
-export { Accounts, Demo, Library, Room, Standings };
+export { Accounts, Demo, JevLedger, Library, Room, Standings };
 
 export interface Env {
   ROOMS: DurableObjectNamespace<Room>;
@@ -54,6 +55,8 @@ export interface Env {
   LIBRARY: DurableObjectNamespace<Library>;
   /** The Ceramic Duck Hours standings (one object). */
   STANDINGS: DurableObjectNamespace<Standings>;
+  /** What Jev has cost across games (one object, host only). */
+  JEV_LEDGER: DurableObjectNamespace<JevLedger>;
   /** Secret: password the host types to create a room. */
   HOST_PASSWORD: string;
   /** Secret: TypeSafe API key for Jev. Without it, written answers are hand-scored. */
