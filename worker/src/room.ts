@@ -61,6 +61,16 @@ import { standingsStub } from "./standings";
 import { jevLedgerStub } from "./jevLedger";
 import { sumSpend } from "../../shared/jevCost";
 import { gameKey, type JevLedgerSummary } from "../../shared/jevLedger";
+import { DEMO_NAMES } from "../../shared/demo";
+import { PRACTICE_MAX_PLAYERS, type PracticeJoinResponse } from "../../shared/practice";
+import {
+  autopilotDeadline,
+  autopilotStep,
+  createPracticeRoom,
+  practiceJevLeft,
+  practiceName,
+  spendPracticeJev,
+} from "./autopilot";
 import type { Env } from "./index";
 import { randomToken, timingSafeEqual } from "./secrets";
 import { logEvent } from "./log";
@@ -144,6 +154,8 @@ export class Room extends DurableObject<Env> {
 
   async join(req: JoinRequest): Promise<JoinResponse | { error: string }> {
     if (!this.room) return { error: "Room not found" };
+    // The practice room is join-by-name only: no accounts, no Duck Hours.
+    if (this.room.autopilot) return { error: "This is the practice room: join it from the practice page." };
     if (this.room.phase === "ended") return { error: "This game has ended" };
     const account = await accountsStub(this.env).verify(
       String(req?.account?.id ?? ""),
@@ -188,6 +200,46 @@ export class Room extends DurableObject<Env> {
     }
   }
 
+  /**
+   * The practice room (shared/practice.ts): set it up if it isn't running,
+   * and seat someone by name, no account needed.
+   */
+  async joinPractice(name: unknown): Promise<PracticeJoinResponse | { error: string }> {
+    const now = Date.now();
+    if (!this.room) {
+      this.room = createPracticeRoom(randomToken(), now);
+      logEvent("practice_room_created", {});
+    }
+    const room = this.room;
+    const ap = room.autopilot;
+    if (!ap) return { error: "That room isn't a practice room" };
+    if (this.connected().size >= PRACTICE_MAX_PLAYERS) {
+      return { error: "The practice room is full right now. Try again in a little while." };
+    }
+    try {
+      const player = addPlayer(
+        room,
+        {
+          name: practiceName(room, name, () => DEMO_NAMES[Math.floor(Math.random() * DEMO_NAMES.length)]),
+          teamId: null,
+          duckHolderId: null,
+          lookIndex: ap.nextLook++,
+        },
+        crypto.randomUUID(),
+        randomToken(),
+        now,
+      );
+      ap.touchedAt = now;
+      await this.save();
+      this.broadcast();
+      logEvent("practice_room_join", { players: Object.keys(room.players).length });
+      return { code: room.code, playerId: player.id, token: player.token, judged: this.judgeAvailable };
+    } catch (err) {
+      if (err instanceof RuleError) return { error: err.message };
+      throw err;
+    }
+  }
+
   // ---- WebSockets ----------------------------------------------------------
 
   async fetch(request: Request): Promise<Response> {
@@ -220,6 +272,8 @@ export class Room extends DurableObject<Env> {
     this.syncArena();
     // Everyone else sees this player come online.
     this.broadcast();
+    // Practice room: someone's here, so the lobby clock can start.
+    await this.runAutopilot();
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -276,6 +330,8 @@ export class Room extends DurableObject<Env> {
       throw err;
     }
     await this.commit(effects);
+    // Practice room: everyone's argued, so the debate can close sooner.
+    await this.runAutopilot();
     // Outfits live on the account too, so they come along to the next game.
     if (msg.t === "outfit" && who.role === "player") {
       const p = this.room?.players[who.playerId];
@@ -309,6 +365,7 @@ export class Room extends DurableObject<Env> {
     }
     this.broadcast();
     this.syncArena();
+    this.ctx.waitUntil(this.runAutopilot());
   }
 
   // ---- Alarms: question deadlines and room expiry --------------------------
@@ -316,7 +373,7 @@ export class Room extends DurableObject<Env> {
   async alarm() {
     if (!this.room) return;
     const now = Date.now();
-    if (now >= this.room.createdAt + ROOM_TTL_MS) {
+    if (now >= this.expiresAt(this.room)) {
       for (const ws of this.ctx.getWebSockets()) ws.close(1000, "Room expired");
       this.room = null;
       await this.ctx.storage.deleteAll();
@@ -329,12 +386,43 @@ export class Room extends DurableObject<Env> {
     await this.commit(
       tick(this.room, { now, seed: randomSeed(), judgeAvailable: this.judgeAvailable }),
     );
+    await this.runAutopilot();
   }
 
   // ---- Internals -----------------------------------------------------------
 
   private get judgeAvailable(): boolean {
-    return Boolean(this.env.JEV_API_KEY);
+    if (!this.env.JEV_API_KEY) return false;
+    // The practice room has a daily Jev budget.
+    return !this.room?.autopilot || practiceJevLeft(this.room, Date.now()) > 0;
+  }
+
+  /** Rooms last a day; the practice room, a day after anyone last joined or played. */
+  private expiresAt(room: RoomState): number {
+    return (room.autopilot?.touchedAt ?? room.createdAt) + ROOM_TTL_MS;
+  }
+
+  /** Practice room: move the game on when it's time (see autopilot.ts). */
+  private async runAutopilot() {
+    const room = this.room;
+    if (!room?.autopilot) return;
+    // Players see when it moves on next, and an untimed question's new clock.
+    const shown = () => `${room.autopilot?.at}|${room.run?.closesAt}`;
+    let sent = shown();
+    // A few at most: one step can make the next due at once.
+    for (let i = 0; i < 4; i++) {
+      const effects = autopilotStep(room, {
+        now: Date.now(),
+        seed: randomSeed(),
+        judgeAvailable: this.judgeAvailable,
+        connected: this.connected(),
+      });
+      if (!effects) break;
+      await this.commit(effects);
+      sent = shown();
+    }
+    await this.save();
+    if (shown() !== sent) this.broadcast();
   }
 
   private async commit(effects: Effects) {
@@ -367,7 +455,8 @@ export class Room extends DurableObject<Env> {
   private async save() {
     if (!this.room) return;
     await this.ctx.storage.put("room", this.room);
-    await this.ctx.storage.setAlarm(nextDeadline(this.room) ?? this.room.createdAt + ROOM_TTL_MS);
+    const deadlines = [nextDeadline(this.room), autopilotDeadline(this.room)].filter((t) => t !== null);
+    await this.ctx.storage.setAlarm(deadlines.length ? Math.min(...deadlines) : this.expiresAt(this.room));
   }
 
   private async runJudging() {
@@ -383,6 +472,8 @@ export class Room extends DurableObject<Env> {
           ? [{ playerId, text: s.value.text, side: s.value.side }]
           : [],
     );
+    // Practice room: counted up front, so calls that fail still use up the day's budget.
+    if (room.autopilot) spendPracticeJev(room, Date.now(), items.length);
     const cfg: JevConfig = {
       apiKey: this.env.JEV_API_KEY!,
       url: this.env.JEV_API_URL,
@@ -403,6 +494,7 @@ export class Room extends DurableObject<Env> {
       finishJudging(this.room, segId);
       await this.save();
       this.broadcast();
+      await this.runAutopilot();
     } finally {
       await this.recordJevSpend(room);
     }

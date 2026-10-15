@@ -126,6 +126,9 @@ function CodeEntry({ onExit }: { onExit: () => void }) {
         <a href="#/live/arena" className="mt-6 block text-sm font-semibold text-emerald-700 underline">
           Practise steering your duck
         </a>
+        <a href="#/live/test" className="mt-3 block text-sm font-semibold text-violet-700 underline">
+          Practise debates and teams
+        </a>
         <button type="button" onClick={onExit} className="mt-3 text-sm text-neutral-500 underline">
           Back
         </button>
@@ -261,14 +264,17 @@ const STATUS_TEXT: Partial<Record<RoomStatus, string>> = {
   reconnecting: "Reconnecting…",
 };
 
-function PlayerGame({
+export function PlayerGame({
   creds,
   onLeave,
   onExit,
+  rejoinWhenGone = false,
 }: {
   creds: PlayerCreds;
   onLeave: () => void;
   onExit: () => void;
+  /** Offer "Join again" when the room's gone too (the practice room sets itself up again). */
+  rejoinWhenGone?: boolean;
 }) {
   const { view, status, error, clearError, send, offsetMs, arenaRef } = useRoom<PlayerView>(creds.code, {
     token: creds.token,
@@ -286,7 +292,7 @@ function PlayerGame({
       <Shell>
         <div className="m-auto max-w-sm space-y-4 text-center">
           <p className="text-lg">{msg}</p>
-          {status === "rejected" && (
+          {(status === "rejected" || (status === "gone" && rejoinWhenGone)) && (
             <button
               type="button"
               onClick={onLeave}
@@ -348,7 +354,8 @@ function PlayerGame({
 
       <footer className="mt-8 space-y-4">
         <ControlsHint />
-        <div className="rounded-xl border border-neutral-200 bg-white p-4">
+        {/* Nobody hosts the practice room, so there's nobody to ask. */}
+        {!view.autopilot && <div className="rounded-xl border border-neutral-200 bg-white p-4">
           <button
             type="button"
             onClick={() => setShowQna((v) => !v)}
@@ -363,7 +370,7 @@ function PlayerGame({
               <QnaList items={view.qna} onVote={(id) => send({ t: "qnaVote", id })} />
             </div>
           )}
-        </div>
+        </div>}
       </footer>
     </Shell>
   );
@@ -486,9 +493,18 @@ function StageBody({ view, send, offsetMs, feed }: StageProps) {
           <p className="mt-2 text-left text-xs text-neutral-500">Saved for your next game too.</p>
         </div>
         <p className="text-neutral-600">
-          Waiting for the host to start <strong>{view.title}</strong>.{" "}
+          {view.autopilot ? (
+            <>
+              <strong>{view.title}</strong> starts by itself.{" "}
+            </>
+          ) : (
+            <>
+              Waiting for the host to start <strong>{view.title}</strong>.{" "}
+            </>
+          )}
           {view.players.length} player{view.players.length === 1 ? "" : "s"} here.
         </p>
+        {view.autopilot && <AutoNext at={view.autopilot.nextAt} offsetMs={offsetMs} what="Starting" />}
       </div>
     );
   }
@@ -516,7 +532,15 @@ function StageBody({ view, send, offsetMs, feed }: StageProps) {
           teamScoring={view.settings.teamScoring}
           highlightId={view.me.id}
         />
-        {view.phase === "ended" && <PlayerDuckHours view={view} />}
+        {view.autopilot ? (
+          <AutoNext
+            at={view.autopilot.nextAt}
+            offsetMs={offsetMs}
+            what={view.phase === "ended" ? "A new game" : "Next question"}
+          />
+        ) : (
+          view.phase === "ended" && <PlayerDuckHours view={view} />
+        )}
       </div>
     );
   }
@@ -533,6 +557,18 @@ function StageBody({ view, send, offsetMs, feed }: StageProps) {
         <QuestionStage key={seg.id} seg={seg} view={view} send={send} offsetMs={offsetMs} feed={feed} />
       )}
     </div>
+  );
+}
+
+/** Practice room: when the game moves itself on. */
+function AutoNext({ at, offsetMs, what }: { at: number | null; offsetMs: number; what: string }) {
+  const now = useServerNow(offsetMs);
+  if (at === null) return null;
+  const n = Math.max(0, Math.ceil((at - now) / 1000));
+  return (
+    <p className="text-center text-sm font-semibold text-violet-700" aria-live="polite">
+      {what} in {n}…
+    </p>
   );
 }
 
@@ -814,7 +850,7 @@ function WrittenInput({
           {saved
             ? disabled
               ? "✓ Submitted"
-              : "✓ Saved. You can keep editing until the host closes this."
+              : "✓ Saved. You can keep editing until answers close."
             : submitted !== null
               ? "Unsaved changes. Press Enter to update."
               : `${text.length}/${maxLength}`}

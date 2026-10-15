@@ -129,7 +129,7 @@ export function DebateInput({
           />
           <div className="flex items-center justify-between gap-3 text-sm text-neutral-500">
             <span aria-live="polite">
-              {saved ? (disabled ? "✓ Submitted" : "✓ Saved. Keep editing until the host closes this.") : "Saves as you type."}
+              {saved ? (disabled ? "✓ Submitted" : "✓ Saved. Keep editing until answers close.") : "Saves as you type."}
             </span>
             <span className="tabular-nums">
               {text.length}/{maxLength}

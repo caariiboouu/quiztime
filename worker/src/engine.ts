@@ -52,6 +52,7 @@ import { cleanOutfit, type DuckOutfit } from "../../shared/outfit";
 import { ranksFromScores } from "../../shared/duckStandings";
 import { addCall, NO_SPEND, sumSpend, type JevCall, type JevSpend } from "../../shared/jevCost";
 import { gameKey, type JevLedgerSummary } from "../../shared/jevLedger";
+import type { Autopilot } from "./autopilot";
 import {
   levelPoints,
   numericAwards,
@@ -145,6 +146,8 @@ export type RoomState = {
    * re-judging don't give the money back.
    */
   jevSpend?: Record<string, JevSpend>;
+  /** Set on a room that runs itself with nobody hosting (the practice room). */
+  autopilot?: Autopilot;
 };
 
 /**
@@ -1431,6 +1434,7 @@ export function playerView(
           .reduce((s, e) => s + e.points, 0)
       : null,
     qna: publicQna(state, playerId),
+    autopilot: state.autopilot ? { nextAt: state.autopilot.at } : null,
   };
 }
 

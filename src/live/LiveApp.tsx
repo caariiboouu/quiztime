@@ -4,6 +4,7 @@ import { liveConfigured } from "./api";
 import { ArenaPracticePage } from "./arena/ArenaPracticePage";
 import { FlockPage } from "./flock/FlockPage";
 import { MascotGallery } from "./mascot/MascotGallery";
+import { PracticeRoomPage } from "./practice/PracticeRoomPage";
 
 /** See ./routes.ts for the hash routes. */
 
@@ -21,6 +22,7 @@ export function LiveApp({ hash, onExit }: { hash: string; onExit: () => void }) 
     );
   }
   if (hash === "#/live/host") return <HostApp onExit={onExit} />;
+  if (hash === "#/live/test") return <PracticeRoomPage onExit={onExit} />;
   const m = hash.match(/^#\/live\/join\/([A-Za-z]{4})$/);
   const code = m ? m[1].toUpperCase() : null;
   return <PlayerApp key={code ?? "entry"} code={code} onExit={onExit} />;

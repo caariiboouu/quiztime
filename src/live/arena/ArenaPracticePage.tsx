@@ -53,13 +53,7 @@ export function ArenaPracticePage({ onExit }: { onExit: () => void }) {
           </div>
         </header>
         {name === null ? (
-          <NameStep
-            onGo={(n) => {
-              // "Surprise me" keeps the name they typed before for next time.
-              if (n) rememberName(n);
-              setName(n);
-            }}
-          />
+          <NameStep onGo={setName} />
         ) : (
           <ArenaPractice name={name} onChangeName={() => setName(null)} />
         )}
@@ -71,14 +65,17 @@ export function ArenaPracticePage({ onExit }: { onExit: () => void }) {
   );
 }
 
-function NameStep({ onGo }: { onGo: (name: string) => void }) {
+/** Name your duck (remembered for next time), or "" for a random duck name. */
+export function NameStep({ onGo, busy = false }: { onGo: (name: string) => void; busy?: boolean }) {
   const [value, setValue] = useState(rememberedName);
   const clean = value.replace(/\s+/g, " ").trim();
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (clean) onGo(clean);
+        if (!clean || busy) return;
+        rememberName(clean);
+        onGo(clean);
       }}
       className="mx-auto max-w-sm space-y-4 rounded-2xl bg-white p-5 text-center shadow-sm"
     >
@@ -95,12 +92,18 @@ function NameStep({ onGo }: { onGo: (name: string) => void }) {
       </label>
       <button
         type="submit"
-        disabled={!clean}
+        disabled={!clean || busy}
         className="w-full rounded-xl bg-amber-500 py-3.5 text-lg font-bold text-white shadow hover:brightness-110 disabled:opacity-40"
       >
         Let's waddle
       </button>
-      <button type="button" onClick={() => onGo("")} className="text-sm text-neutral-500 underline">
+      {/* "Surprise me" keeps the name they typed before for next time. */}
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => onGo("")}
+        className="text-sm text-neutral-500 underline disabled:opacity-40"
+      >
         Surprise me with a duck name
       </button>
     </form>

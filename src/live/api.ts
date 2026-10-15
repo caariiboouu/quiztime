@@ -13,6 +13,7 @@ import type {
 } from "../../shared/protocol";
 import type { DuckHoursData } from "../types";
 import type { DuckOutfit } from "../../shared/outfit";
+import type { PracticeJoinResponse } from "../../shared/practice";
 
 /**
  * Where the live-quiz Worker lives. Set VITE_LIVE_API_URL at build time
@@ -82,6 +83,10 @@ export const undoDuckStandings = (password: string) =>
     method: "POST",
     body: JSON.stringify({ password }),
   });
+
+/** Join the self-running debate & teams practice room with just a name. */
+export const joinPractice = (name: string) =>
+  call<PracticeJoinResponse>("/api/practice/join", { method: "POST", body: JSON.stringify({ name }) });
 
 export const listAccounts = () => call<AccountList>("/api/accounts");
 

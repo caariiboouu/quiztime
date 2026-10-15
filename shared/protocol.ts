@@ -403,6 +403,12 @@ export type PlayerView = {
   /** My points from the current segment, once revealed. */
   myAward: number | null;
   qna: PublicQna[];
+  /**
+   * The self-running practice room (shared/practice.ts): there's no host, and
+   * the game moves on by itself at `nextAt` (null while it waits on a
+   * question's own clock, or for someone to turn up). Null in a normal room.
+   */
+  autopilot: { nextAt: number | null } | null;
 };
 
 export type PublicQna = {

@@ -7,6 +7,7 @@
  *   GET  /api/rooms/:code/ws     WebSocket (?host=<hostKey> or ?token=<token>)
  *   GET  /api/demo/ws            WebSocket: the public practice arena (no sign-up)
  *   GET  /api/demo/stats         how the practice arena is doing (counts, recent errors)
+ *   POST /api/practice/join      join the self-running debate & teams practice room by name
  *   GET  /api/accounts           everyone who has an account (names, no secrets)
  *   POST /api/accounts           claim a Duck Hours entry or add someone new (+ PIN)
  *   POST /api/accounts/:id/login sign in on this device with the PIN
@@ -41,6 +42,7 @@ import type { DuckHoursData } from "../../src/types";
 import { validateSettings, validateShow } from "./engine";
 import { Demo } from "./demo";
 import { Room } from "./room";
+import { PRACTICE_CODE } from "../../shared/practice";
 import { randomToken, timingSafeEqual } from "./secrets";
 
 export { Accounts, Demo, JevLedger, Library, Room, Standings };
@@ -241,6 +243,13 @@ export default {
         }
       }
       return json({ error: "Couldn't find a free room code; try again" }, 503, origin);
+    }
+
+    if (url.pathname === "/api/practice/join" && request.method === "POST") {
+      const body = await readJson<{ name?: unknown }>(request);
+      if (!body) return json({ error: "Invalid JSON" }, 400, origin);
+      const res = await env.ROOMS.get(env.ROOMS.idFromName(PRACTICE_CODE)).joinPractice(body.name);
+      return "error" in res ? json(res, 400, origin) : json(res, 201, origin);
     }
 
     const m = url.pathname.match(/^\/api\/rooms\/([A-Za-z]{4})(\/join|\/ws)?$/);
