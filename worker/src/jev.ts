@@ -30,6 +30,7 @@ import {
   type WrittenQuestion,
 } from "../../shared/protocol";
 import { levelPoints } from "../../shared/scoring";
+import type { JevCall } from "../../shared/jevCost";
 
 export type JevConfig = {
   apiKey: string;
@@ -38,6 +39,8 @@ export type JevConfig = {
   fetch?: typeof fetch;
   /** Base backoff in ms; tests set this to 0. */
   backoffMs?: number;
+  /** Told about every call Jev answered (and so billed), for the cost display. */
+  onUsage?: (call: JevCall) => void;
 };
 
 const SUBSTANCE_ONLY =
@@ -78,6 +81,7 @@ type JevAnswer = NoulAnswer | ScoreAnswer | { type: "choice" };
 export type JevResponse = {
   model: string;
   answers: Record<string, JevAnswer>;
+  usage?: { input_tokens?: number | null; output_tokens?: number | null };
 };
 
 export function buildJudgeRequest(
@@ -309,7 +313,15 @@ async function callJev(cfg: JevConfig, body: JevRequest): Promise<JevResponse> {
       await sleep(base * 2 ** attempt);
       continue;
     }
-    if (res.ok) return (await res.json()) as JevResponse;
+    if (res.ok) {
+      const json = (await res.json()) as JevResponse;
+      cfg.onUsage?.({
+        model: json.model || cfg.model,
+        inputTokens: json.usage?.input_tokens ?? null,
+        outputTokens: json.usage?.output_tokens ?? null,
+      });
+      return json;
+    }
 
     const detail = (await res.text()).slice(0, 300);
     lastError = `Jev ${res.status}: ${detail}`;

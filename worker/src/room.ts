@@ -19,6 +19,7 @@ import {
   RuleError,
   addPlayer,
   applyJudgeResult,
+  recordJevUsage,
   createRoom,
   currentSegment,
   finishJudging,
@@ -380,6 +381,10 @@ export class Room extends DurableObject<Env> {
       apiKey: this.env.JEV_API_KEY!,
       url: this.env.JEV_API_URL,
       model: this.env.JEV_MODEL,
+      // Counted even if the host has moved on by the time Jev answers: it's still billed.
+      onUsage: (call) => {
+        if (this.room) recordJevUsage(this.room, segId, call);
+      },
     };
     await judgeAll(cfg, question, items, async (playerId, result) => {
       if (!this.room) return;

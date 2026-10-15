@@ -13,6 +13,7 @@ import {
   openArena,
   playerAction,
   playerView,
+  recordJevUsage,
   scores,
   seededRng,
   setArenaAnswers,
@@ -884,6 +885,43 @@ describe("debate question", () => {
     host(room, { t: "advance" }, t0);
     expect(room.run?.reveal?.levels).toEqual({ p1: 4, p2: 2 });
     expect(scores(room).get("p2")).toBe(50);
+  });
+
+  it("keeps a running Jev cost for the host that back and re-judging don't undo", () => {
+    const { room, t0 } = open();
+    const call = { model: "jev-1.13.0", inputTokens: 1000, outputTokens: 20 };
+    const spend = () => hostView(room, both, t0, true).jevSpend;
+    expect(spend()).toEqual({ question: null, game: { calls: 0, inputTokens: 0, outputTokens: 0, usd: 0, unpriced: 0 } });
+
+    answer(room, "p1", "d1", { type: "debate", side: "for", text: "Ducks are calmer" }, t0);
+    answer(room, "p2", "d1", { type: "debate", side: "against", text: "Geese guard farms" }, t0);
+    host(room, { t: "advance" }, t0);
+    recordJevUsage(room, "d1", call);
+    recordJevUsage(room, "d1", call);
+    finishJudging(room, "d1");
+    // Re-judging pays again.
+    expect(host(room, { t: "rejudge" }, t0).startJudging).toBe(true);
+    recordJevUsage(room, "d1", call);
+    finishJudging(room, "d1");
+    expect(spend().question).toMatchObject({ calls: 3, inputTokens: 3000, outputTokens: 60, unpriced: 0 });
+    expect(spend().question?.usd).toBeCloseTo((3000 * 0.042) / 1_000_000, 12);
+
+    host(room, { t: "advance" }, t0);
+    host(room, { t: "back" }, t0);
+    expect(spend().game.calls).toBe(3);
+    // …and it's saved with the room, so a restart doesn't lose it.
+    const reloaded = loadRoom(JSON.parse(JSON.stringify(room)))!;
+    expect(hostView(reloaded, both, t0, true).jevSpend.game.calls).toBe(3);
+
+    // A call that lands after the game moved on still counts toward the game.
+    recordJevUsage(room, "an-earlier-question", { model: "jev-1.13.0", inputTokens: null, outputTokens: null });
+    expect(spend().question?.calls).toBe(3);
+    expect(spend().game).toMatchObject({ calls: 4, unpriced: 1 });
+
+    // Players never see it.
+    const pv = JSON.stringify(playerView(room, "p1", both, t0));
+    expect(pv).not.toContain("jevSpend");
+    expect(pv).not.toContain("inputTokens");
   });
 });
 

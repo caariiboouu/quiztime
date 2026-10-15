@@ -37,6 +37,8 @@ import { useControls } from "./controls";
 import { Mascot } from "./mascot/Mascot";
 import { PinResets } from "./account/PinResets";
 import { DuckHoursAdmin } from "./host/DuckHoursAdmin";
+import { JevCostPanel } from "./host/JevCostPanel";
+import { formatUsd } from "../../shared/jevCost";
 import { DuckHoursPreviewList, DuckHoursStandings, QuizPodium } from "./results";
 import { lookFor } from "./mascot/variants";
 import { duckHoursLeader } from "./mascot/duckChampion";
@@ -490,7 +492,7 @@ function HostConsole({
   const { view, status, error, clearError, send, offsetMs, arenaRef } = useRoom<HostView>(creds.code, {
     host: creds.hostKey,
   });
-  const [panel, setPanel] = useState<"none" | "players" | "qna">("none");
+  const [panel, setPanel] = useState<"none" | "players" | "qna" | "jev">("none");
   const [copied, setCopied] = useState(false);
 
   // Peeking applies to one question stage only, so moving on hides it again.
@@ -510,7 +512,8 @@ function HostConsole({
         else if (c === "left" && canGoBack) send({ t: "back" });
       },
     },
-    (!!next || canGoBack) && panel === "none",
+    // The Jev cost panel has nothing to type in, so it can stay open while you play.
+    (!!next || canGoBack) && (panel === "none" || panel === "jev"),
   );
 
   if (status === "gone" || status === "rejected") {
@@ -577,6 +580,17 @@ function HostConsole({
           >
             💬 Q&amp;A{openQna ? ` (${openQna})` : ""}
           </button>
+          {(view.judgeConfigured || view.jevSpend.game.calls > 0) && (
+            <button
+              type="button"
+              onClick={() => setPanel(panel === "jev" ? "none" : "jev")}
+              aria-label={`Jev cost this game: ${formatUsd(view.jevSpend.game.usd)}. Show details`}
+              className={`rounded-md border px-3 py-1.5 tabular-nums ${panel === "jev" ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 bg-white"}`}
+            >
+              🪙 Jev {formatUsd(view.jevSpend.game.usd)}
+              {view.jevSpend.game.unpriced > 0 ? "+" : ""}
+            </button>
+          )}
           {status !== "open" && (
             <span className="rounded bg-amber-100 px-2 py-1 text-xs text-amber-900">Reconnecting…</span>
           )}
@@ -592,13 +606,15 @@ function HostConsole({
       )}
 
       <div className="flex flex-1">
-        <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
+        <main className="mx-auto w-full min-w-0 max-w-5xl flex-1 px-6 py-8">
           <HostStage view={view} send={send} offsetMs={offsetMs} peek={peek} link={link} feed={arenaRef} />
         </main>
         {panel !== "none" && (
           <aside className="w-full max-w-sm shrink-0 overflow-y-auto border-l border-neutral-200 bg-white p-4">
             {panel === "players" ? (
               <PlayersPanel view={view} onKick={(id) => send({ t: "kick", playerId: id })} />
+            ) : panel === "jev" ? (
+              <JevCostPanel view={view} />
             ) : (
               <QnaPanel view={view} send={send} />
             )}

@@ -1,5 +1,6 @@
 import type { ArenaDuck, ArenaMove } from "./arenaSim";
 import type { DuckOutfit } from "./outfit";
+import type { JevSpend } from "./jevCost";
 
 /**
  * Wire protocol and data model for the online ("live") quiz, shared by the
@@ -447,6 +448,8 @@ export type HostView = {
   segments: { id: string; label: string }[];
   qna: (PublicQna & { hidden: boolean })[];
   judgeConfigured: boolean;
+  /** What Jev has cost: this question so far, and the whole game. Host only. */
+  jevSpend: { question: JevSpend | null; game: JevSpend };
 };
 
 export type RoomView = PlayerView | HostView;

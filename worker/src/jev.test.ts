@@ -119,6 +119,30 @@ describe("judgeWritten", () => {
     expect(f).toHaveBeenCalledTimes(3);
   });
 
+  it("reports the tokens of each call Jev answered, and only those", async () => {
+    const calls: unknown[] = [];
+    const f = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("busy", { status: 529 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ...response(), model: "jev-1.14.0", usage: { input_tokens: 296, output_tokens: 20 } }), {
+          status: 200,
+        }),
+      );
+    await judgeWritten({ ...cfg(f as unknown as typeof fetch), onUsage: (c) => calls.push(c) }, Q, "ok");
+    expect(calls).toEqual([{ model: "jev-1.14.0", inputTokens: 296, outputTokens: 20 }]);
+  });
+
+  it("still counts a call whose response leaves out usage, as unknown", async () => {
+    const calls: unknown[] = [];
+    const noModel: Partial<JevResponse> = response();
+    delete noModel.model;
+    const f = vi.fn(async () => new Response(JSON.stringify(noModel), { status: 200 }));
+    const r = await judgeWritten({ ...cfg(f as unknown as typeof fetch), onUsage: (c) => calls.push(c) }, Q, "ok");
+    expect(r.status).toBe("ok");
+    expect(calls).toEqual([{ model: "jev-1.13.0", inputTokens: null, outputTokens: null }]);
+  });
+
   it("does not retry auth errors, and returns an error result for hand scoring", async () => {
     const f = vi.fn(async () => new Response("bad key", { status: 401 }));
     const r = await judgeWritten(cfg(f as unknown as typeof fetch), Q, "ok");

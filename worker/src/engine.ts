@@ -50,6 +50,7 @@ import {
 } from "../../shared/protocol";
 import { cleanOutfit, type DuckOutfit } from "../../shared/outfit";
 import { ranksFromScores } from "../../shared/duckStandings";
+import { addCall, NO_SPEND, sumSpend, type JevCall, type JevSpend } from "../../shared/jevCost";
 import {
   levelPoints,
   numericAwards,
@@ -138,6 +139,11 @@ export type RoomState = {
   undo?: UndoStep[];
   /** Set once this game's results have gone into the Duck Hours standings. */
   duckHours?: DuckHoursResult | null;
+  /**
+   * What Jev has cost, by segment id. Outside `run` on purpose: "back" and
+   * re-judging don't give the money back.
+   */
+  jevSpend?: Record<string, JevSpend>;
 };
 
 /**
@@ -880,6 +886,12 @@ export function applyJudgeResult(state: RoomState, segId: string, playerId: stri
   state.run.judge[playerId] = result;
 }
 
+/** Jev answered (and billed) a call for this segment, even if the game has moved on since. */
+export function recordJevUsage(state: RoomState, segId: string, call: JevCall) {
+  state.jevSpend ??= {};
+  state.jevSpend[segId] = addCall(state.jevSpend[segId] ?? NO_SPEND, call);
+}
+
 export function finishJudging(state: RoomState, segId: string) {
   const seg = currentSegment(state);
   if (state.run?.stage === "judging" && seg && segmentId(seg) === segId) {
@@ -1517,6 +1529,14 @@ export function hostView(
       }))
       .sort((a, b) => Number(a.answered) - Number(b.answered) || b.votes - a.votes),
     judgeConfigured,
+    jevSpend: (() => {
+      const seg = currentSegment(state);
+      const bySeg = state.jevSpend ?? {};
+      return {
+        question: seg ? (bySeg[segmentId(seg)] ?? null) : null,
+        game: sumSpend(Object.values(bySeg)),
+      };
+    })(),
     canGoBack,
   };
 }
