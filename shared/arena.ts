@@ -75,6 +75,24 @@ export function lobbyLayout(): ArenaLayout {
   };
 }
 
+/**
+ * The team-mode waiting room: the same patch, with each team owning a wedge
+ * around a small no-team circle in the middle. Walking into a team's wedge
+ * joins it; zone i is team i, in the same directions as the answer pad.
+ */
+export const TEAM_LOBBY_NEUTRAL = 2.8;
+export function teamLobbyLayout(teams: number): ArenaLayout {
+  const n = Math.max(2, Math.min(4, Math.floor(teams)));
+  return {
+    options: n,
+    spawn: 1.6,
+    neutral: TEAM_LOBBY_NEUTRAL,
+    radius: LOBBY_RADIUS,
+    zones: wedges(n, TEAM_LOBBY_NEUTRAL, LOBBY_RADIUS),
+    bounds: { halfWidth: LOBBY_RADIUS, halfDepth: LOBBY_RADIUS },
+  };
+}
+
 /** Nose to tail, roughly, at the size ducks are drawn. */
 export const DUCK_LENGTH = 1.3;
 /** Every answer is at least this many duck lengths' waddle from the huddle. */
@@ -100,6 +118,18 @@ export function arenaLayout(options: number, players: number): ArenaLayout {
     spawn + MIN_TRAVEL_DUCKS * DUCK_LENGTH,
   );
   const radius = neutral + ZONE_DEPTH;
+  return {
+    options: n,
+    spawn,
+    neutral,
+    radius,
+    zones: wedges(n, neutral, radius),
+    bounds: { halfWidth: radius, halfDepth: radius },
+  };
+}
+
+/** One wedge per option between the neutral circle and the edge, pad directions first. */
+function wedges(n: number, neutral: number, radius: number): ArenaZone[] {
   const angles = PAD_DIRS[n]
     ? PAD_DIRS[n].map((d) => DIR_ANGLE[d])
     : Array.from({ length: n }, (_, i) => Math.PI / 2 - (i * TAU) / n);
@@ -123,15 +153,7 @@ export function arenaLayout(options: number, players: number): ArenaLayout {
       label: { x: Math.cos(angles[i]) * mid, z: -Math.sin(angles[i]) * mid },
     };
   });
-
-  return {
-    options: n,
-    spawn,
-    neutral,
-    radius,
-    zones,
-    bounds: { halfWidth: radius, halfDepth: radius },
-  };
+  return zones;
 }
 
 /** Which option a duck standing at (x, z) is answering, or null in the middle. */

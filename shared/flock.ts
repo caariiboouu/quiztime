@@ -439,6 +439,26 @@ function jostle(w: Walker, by: string, now: number) {
   w.vy = Math.max(w.vy, HOP_SPEED * (1 + HOP_PER_BUMPER * (level - 1)));
 }
 
+/** How long a launch stays in the air (up at FLY_LAUNCH, back down under FLY_GRAVITY). */
+export const FLIGHT_SECONDS = (2 * FLY_LAUNCH) / FLY_GRAVITY;
+
+/**
+ * Launch a duck over everyone's heads to land on (x, z): the same take-off
+ * as being jostled into the air, aimed. Used when the host moves a duck
+ * (e.g. auto-balancing teams).
+ */
+export function flyTo(w: Walker, x: number, z: number) {
+  w.flying = true;
+  w.air = Math.max(w.air, 0.01);
+  w.vy = FLY_LAUNCH;
+  w.fx = (x - w.x) / FLIGHT_SECONDS;
+  w.fz = (z - w.z) / FLIGHT_SECONDS;
+  w.kx = w.kz = 0;
+  w.hold = null;
+  w.bumpers = [];
+  if (Math.hypot(w.fx, w.fz) > 1e-3) w.heading = Math.atan2(-w.fz, w.fx);
+}
+
 /** How far ahead a waddling duck looks for someone to go round. */
 const LOOK_AHEAD = 1.5;
 const AVOID_STRENGTH = 1.6;

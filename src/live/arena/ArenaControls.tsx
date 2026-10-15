@@ -4,7 +4,7 @@ import { HOLD_REFRESH, type ArenaMove } from "../../../shared/arenaSim";
 import type { Dir } from "../../../shared/flock";
 import { ARROW, useControls } from "../controls";
 import { preloadSounds, setSoundOn, soundOn } from "../effects/sound";
-import { ZONE_COLORS, zoneBadge } from "./colors";
+import { zoneBadge, zoneColor } from "./colors";
 import { TOUCH_CONTROLS_HEIGHT } from "./touch";
 
 const DIRS: Dir[] = ["up", "left", "right", "down"];
@@ -39,11 +39,17 @@ export function ArenaControls({
   layout,
   disabled = false,
   overlay = false,
+  colors,
+  zoneLabel = "answer",
 }: {
   onMove: (m: ArenaMove) => void;
   layout: ArenaLayout;
   disabled?: boolean;
   overlay?: boolean;
+  /** Zone colours, if not the answer colours (teams). */
+  colors?: string[];
+  /** What a zone is, for screen readers ("answer", "team"). */
+  zoneLabel?: string;
 }) {
   const options = layout.options;
   const send = useRef(onMove);
@@ -188,10 +194,10 @@ export function ArenaControls({
                 key={z.index}
                 type="button"
                 disabled={disabled}
-                aria-label={`Waddle to answer ${z.index + 1}`}
+                aria-label={`Waddle to ${zoneLabel} ${z.index + 1}`}
                 onClick={() => onMove({ zone: z.index })}
                 className="h-12 min-w-12 touch-manipulation rounded-xl px-2 text-sm font-black text-white shadow disabled:opacity-60"
-                style={{ background: ZONE_COLORS[z.index % ZONE_COLORS.length] }}
+                style={{ background: zoneColor(z.index, colors) }}
               >
                 {zoneBadge(z.index, z.angle)}
               </button>

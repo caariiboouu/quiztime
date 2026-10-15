@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  MAX_DEBATE_LENGTH,
   MAX_WRITTEN_LENGTH,
   MINIGAME_COUNTDOWN_SEC,
   LOBBY_FEED,
@@ -41,6 +42,9 @@ import { hasWebGL } from "./minigames/three/fallbackContext";
 import { useGraphicsPref } from "./minigames/useGraphicsPref";
 import { useRoom, useServerNow, type ArenaFeed, type RoomStatus } from "./useRoom";
 import { PlayerArena, PlayerLobby } from "./arena/ArenaViews";
+import { DebateInput } from "./debate/DebateInput";
+import { DebatePanel } from "./debate/DebatePanel";
+import { debateNames } from "./debate/debateLayout";
 import { OutfitPicker } from "./account/OutfitPicker";
 import { WhoAreYou } from "./account/WhoAreYou";
 import { DuckHoursStandings, QuizPodium } from "./results";
@@ -142,7 +146,6 @@ function JoinForm({
   const [info, setInfo] = useState<RoomInfo | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [session, setSession] = useState<AccountSession | null>(null);
-  const [teamId, setTeamId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -152,11 +155,11 @@ function JoinForm({
     );
   }, [code]);
 
-  const join = async (s: AccountSession, team: string | null) => {
+  const join = async (s: AccountSession) => {
     setBusy(true);
     setError(null);
     try {
-      const res = await joinRoom(code, { account: { id: s.account.id, token: s.token }, teamId: team });
+      const res = await joinRoom(code, { account: { id: s.account.id, token: s.token } });
       onJoined({ code, ...res });
     } catch (err) {
       const message = (err as Error).message;
@@ -200,7 +203,6 @@ function JoinForm({
     );
   }
 
-  const needsTeam = info.settings.teamMode;
   return (
     <Shell>
       <div className="mx-auto w-full max-w-md space-y-6">
@@ -216,7 +218,7 @@ function JoinForm({
             <WhoAreYou
               onSignedIn={(s) => {
                 setSession(s);
-                if (!needsTeam) void join(s, null);
+                void join(s);
               }}
             />
           </>
@@ -224,7 +226,7 @@ function JoinForm({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              void join(session, teamId);
+              void join(session);
             }}
             className="space-y-6"
           >
@@ -238,38 +240,10 @@ function JoinForm({
                 Not you?
               </button>
             </p>
-            {needsTeam && (
-              <fieldset>
-                <legend className="mb-2 text-sm font-medium text-neutral-700">
-                  Pick a team <span className="text-neutral-400">(arrow keys work here)</span>
-                </legend>
-                <div className="grid grid-cols-2 gap-2">
-                  {info.settings.teams.map((t) => (
-                    <label
-                      key={t.id}
-                      className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 bg-white p-3 font-semibold has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-neutral-900 ${
-                        teamId === t.id ? "border-neutral-900" : "border-neutral-200"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="team"
-                        value={t.id}
-                        checked={teamId === t.id}
-                        onChange={() => setTeamId(t.id)}
-                        className="sr-only"
-                      />
-                      <span className="h-5 w-5 rounded-full" style={{ background: t.color }} />
-                      {t.name}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            )}
             {error && <Banner kind="error">{error}</Banner>}
             <button
               type="submit"
-              disabled={busy || (needsTeam && !teamId)}
+              disabled={busy}
               className="w-full rounded-xl bg-amber-500 py-4 text-xl font-bold text-white shadow hover:brightness-110 disabled:opacity-40"
             >
               {busy ? "Joining…" : "Join"}
@@ -520,16 +494,26 @@ function StageBody({ view, send, offsetMs, feed }: StageProps) {
   }
   if (view.phase === "leaderboard" || view.phase === "ended") {
     const rank = view.players.findIndex((p) => p.id === view.me.id) + 1;
+    const myTeam = view.settings.teamMode ? view.teams.findIndex((t) => t.id === view.me.teamId) : -1;
     return (
       <div className="space-y-6">
         <h2 className="text-center text-2xl font-bold" aria-live="polite">
           {view.phase === "ended" ? `Final: you placed #${rank}!` : `You're #${rank}`}
         </h2>
+        {myTeam >= 0 && (
+          <p className="-mt-4 text-center text-lg font-semibold">
+            <span className="rounded-lg px-2 py-0.5 text-white" style={{ background: view.teams[myTeam].color }}>
+              {view.teams[myTeam].name}
+            </span>{" "}
+            {view.phase === "ended" ? "finished" : "are"} #{myTeam + 1} of {view.teams.length}
+          </p>
+        )}
         {view.phase === "ended" && <QuizPodium players={view.players} />}
         <Leaderboard
           players={view.players}
           teams={view.teams}
           teamMode={view.settings.teamMode}
+          teamScoring={view.settings.teamScoring}
           highlightId={view.me.id}
         />
         {view.phase === "ended" && <PlayerDuckHours view={view} />}
@@ -665,6 +649,28 @@ function QuestionStage({
           submitted={view.myAnswer?.type === "written" ? view.myAnswer.text : null}
           onSubmit={(text) => answer({ type: "written", text })}
         />
+      )}
+
+      {q.type === "debate" && (
+        <>
+          <DebatePanel
+            players={view.players}
+            sides={seg.sides ?? {}}
+            names={debateNames(q.sides)}
+            levels={revealed ? seg.reveal?.levels : undefined}
+            levelCount={seg.reveal?.levelCount}
+            meId={view.me.id}
+            teams={view.settings.teamMode ? view.settings.teams : undefined}
+          />
+          <DebateInput
+            segmentId={seg.id}
+            names={debateNames(q.sides)}
+            maxLength={q.maxLength || MAX_DEBATE_LENGTH}
+            disabled={!open}
+            submitted={view.myAnswer?.type === "debate" ? view.myAnswer : null}
+            onSend={(side, text) => answer({ type: "debate", side, text })}
+          />
+        </>
       )}
 
       {status && (

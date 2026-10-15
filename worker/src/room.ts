@@ -13,7 +13,6 @@ import type {
   PlayerMessage,
   RoomInfo,
   ServerMessage,
-  WrittenQuestion,
 } from "../../shared/protocol";
 import { LOBBY_FEED } from "../../shared/protocol";
 import {
@@ -25,6 +24,8 @@ import {
   finishJudging,
   hostAction,
   hostView,
+  isJudged,
+  setLobbyTeams,
   loadRoom,
   nextDeadline,
   openArena,
@@ -46,6 +47,7 @@ import {
   createArenaSim,
   createLobbySim,
   ensureDuck,
+  flyDuckTo,
   freezeArena,
   removeDuck,
   unfreezeArena,
@@ -75,6 +77,8 @@ const HOST_MESSAGES = new Set<string>([
   "showLeaderboard",
   "end",
   "setFinalPoints",
+  "setLevel",
+  "balanceTeams",
   "rejudge",
   "kick",
   "qnaModerate",
@@ -92,6 +96,8 @@ type RunningArena = {
   last: number;
   lastState: number;
   dirty: boolean;
+  /** Lobby team changes not yet saved to storage. */
+  persist?: boolean;
 };
 
 export class Room extends DurableObject<Env> {
@@ -152,7 +158,7 @@ export class Room extends DurableObject<Env> {
         this.room,
         {
           name: account.name,
-          teamId: req.teamId,
+          teamId: req.teamId ?? null,
           duckHolderId: account.holderId,
           accountId: account.id,
           outfit: account.outfit,
@@ -200,8 +206,10 @@ export class Room extends DurableObject<Env> {
     const { 0: client, 1: server } = new WebSocketPair();
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment(attachment);
-    // Joining mid-arena: give them a duck.
-    if (attachment.role === "player" && this.arena) ensureDuck(this.arena.sim, attachment.playerId);
+    // Joining mid-arena: give them a duck (back in their team's corner, in the lobby).
+    if (attachment.role === "player" && this.arena) {
+      ensureDuck(this.arena.sim, attachment.playerId, this.lobbyZoneOf(attachment.playerId));
+    }
     this.syncArena();
     // Everyone else sees this player come online.
     this.broadcast();
@@ -230,7 +238,7 @@ export class Room extends DurableObject<Env> {
       const arena = this.arena;
       if (who.role !== "player" || !arena || msg.segmentId !== arena.segmentId) return;
       if (!isArenaMove(msg.move)) return;
-      ensureDuck(arena.sim, who.playerId);
+      ensureDuck(arena.sim, who.playerId, this.lobbyZoneOf(who.playerId));
       arenaMove(arena.sim, who.playerId, msg.move);
       return;
     }
@@ -336,6 +344,14 @@ export class Room extends DurableObject<Env> {
     this.resume = effects.resumeArena ?? null;
     this.syncArena();
     this.resume = null;
+    // Auto-balanced: the moved ducks fly over to their new team's corner.
+    if (effects.teamMoves && this.arena?.segmentId === LOBBY_FEED && this.room) {
+      const teams = this.room.settings.teams;
+      for (const m of effects.teamMoves) {
+        const zone = teams.findIndex((t) => t.id === m.teamId);
+        if (zone >= 0) flyDuckTo(this.arena.sim, m.playerId, zone);
+      }
+    }
     if (effects.startJudging) {
       this.ctx.waitUntil(this.runJudging());
     }
@@ -350,11 +366,15 @@ export class Room extends DurableObject<Env> {
   private async runJudging() {
     const room = this.room;
     const seg = room && currentSegment(room);
-    if (!room?.run || seg?.kind !== "question" || seg.question.type !== "written") return;
+    if (!room?.run || seg?.kind !== "question" || !isJudged(seg.question)) return;
     const segId = segmentId(seg);
-    const question: WrittenQuestion = seg.question;
+    const question = seg.question;
     const items = Object.entries(room.run.submissions).flatMap(([playerId, s]) =>
-      s.value.type === "written" ? [{ playerId, text: s.value.text }] : [],
+      s.value.type === "written"
+        ? [{ playerId, text: s.value.text }]
+        : s.value.type === "debate"
+          ? [{ playerId, text: s.value.text, side: s.value.side }]
+          : [],
     );
     const cfg: JevConfig = {
       apiKey: this.env.JEV_API_KEY!,
@@ -449,9 +469,12 @@ export class Room extends DurableObject<Env> {
       this.parked = null;
       return;
     }
+    const teams = room.settings.teamMode ? room.settings.teams.length : 0;
     this.arena = {
       segmentId: want,
-      sim: open ? createArenaSim(open.options.length, ids, open.players) : createLobbySim(ids),
+      sim: open
+        ? createArenaSim(open.options.length, ids, open.players)
+        : createLobbySim(ids, teams, (id) => this.lobbyZoneOf(id)),
       timer: setInterval(() => this.arenaTick(), ARENA_TICK_MS),
       last: now,
       lastState: now,
@@ -467,15 +490,38 @@ export class Room extends DurableObject<Env> {
     const dt = Math.min(0.25, (now - arena.last) / 1000);
     arena.last = now;
     if (tickArena(arena.sim, dt, now)) {
-      // Answers follow the ducks; persisted when the question closes.
-      if (setArenaAnswers(room, arena.sim.zones)) arena.dirty = true;
+      if (arena.segmentId === LOBBY_FEED) {
+        // Team mode lobby: your team is the corner your duck's standing in
+        // (a duck mid-flight counts once it lands).
+        const zones = new Map<string, number | null>();
+        for (const [id, z] of arena.sim.zones) {
+          if (!arena.sim.walkers.get(id)?.flying) zones.set(id, z.zone);
+        }
+        if (setLobbyTeams(room, zones)) arena.dirty = arena.persist = true;
+      } else if (setArenaAnswers(room, arena.sim.zones)) {
+        // Answers follow the ducks; persisted when the question closes.
+        arena.dirty = true;
+      }
     }
     this.sendSnapshot(arena, now);
     if (arena.dirty && now - arena.lastState >= ARENA_STATE_MS) {
       arena.dirty = false;
       arena.lastState = now;
+      if (arena.persist) {
+        arena.persist = false;
+        void this.ctx.storage.put("room", room);
+      }
       this.broadcast();
     }
+  }
+
+  /** Lobby, team mode: which corner this player's duck belongs in (their team's). */
+  private lobbyZoneOf(playerId: string): number | null {
+    const room = this.room;
+    if (!room || room.phase !== "lobby" || !room.settings.teamMode) return null;
+    const teamId = room.players[playerId]?.teamId;
+    const i = room.settings.teams.findIndex((t) => t.id === teamId);
+    return i >= 0 ? i : null;
   }
 
   private sendSnapshot(arena: RunningArena, now: number) {

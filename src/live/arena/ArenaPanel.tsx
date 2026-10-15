@@ -17,6 +17,7 @@ export function ArenaPanel(props: {
   follow?: string | null;
   current?: number | null;
   safeBottom?: number;
+  colors?: string[];
   className?: string;
 }) {
   const description = `Answer arena with ${props.members.length} ducks. Answers: ${props.options

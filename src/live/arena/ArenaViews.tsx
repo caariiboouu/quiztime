@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { arenaLayout, lobbyLayout } from "../../../shared/arena";
-import type { HostView, PlayerView, PublicPlayer, PublicSegment } from "../../../shared/protocol";
+import { arenaLayout, lobbyLayout, teamLobbyLayout } from "../../../shared/arena";
+import type { HostView, PlayerView, PublicPlayer, PublicSegment, RoomSettings } from "../../../shared/protocol";
 import { useDuckLeader } from "../duckStore";
 import { lookFor } from "../mascot/variants";
 import type { DuckOutfit } from "../../../shared/outfit";
@@ -116,6 +116,7 @@ export function ArenaView({
   onToggle,
   current,
   onMove,
+  zoneLabel,
   ...panel
 }: Parameters<typeof ArenaPanel>[0] & {
   overview: boolean;
@@ -123,6 +124,7 @@ export function ArenaView({
   current: number | null;
   /** While answers are open: steer (drawn here on touch screens). */
   onMove?: ((m: ArenaMove) => void) | null;
+  zoneLabel?: string;
 }) {
   const touch = useTouchScreen();
   const overlay = touch && Boolean(onMove);
@@ -136,7 +138,9 @@ export function ArenaView({
           safeBottom={overlay ? TOUCH_CONTROLS_HEIGHT : 0}
           className={touch ? "h-[68svh] min-h-[420px] max-h-[760px]" : undefined}
         />
-        {overlay && onMove && <ArenaControls onMove={onMove} layout={panel.layout} overlay />}
+        {overlay && onMove && (
+          <ArenaControls onMove={onMove} layout={panel.layout} overlay colors={panel.colors} zoneLabel={zoneLabel} />
+        )}
       </div>
       {/* Below the canvas, so it never covers an answer pinned to the bottom edge. */}
       <div className="mt-1.5 flex justify-end">
@@ -247,9 +251,29 @@ export function AnswerList({
 }
 
 /**
+ * The lobby's ground: an open patch, or in team mode a corner per team
+ * (standing in one puts you on that team). Matches the server's layout.
+ */
+function useLobby(settings: RoomSettings) {
+  const teams = settings.teamMode ? settings.teams : [];
+  const key = JSON.stringify(teams.map((t) => [t.id, t.name, t.color]));
+  return useMemo(() => {
+    const list = JSON.parse(key) as [string, string, string][];
+    if (list.length < 2) return { layout: lobbyLayout(), options: [], colors: undefined };
+    return {
+      layout: teamLobbyLayout(list.length),
+      options: list.map(([id, text]) => ({ id, text })),
+      colors: list.map(([, , color]) => color),
+    };
+  }, [key]);
+}
+
+/**
  * The waiting room for a player: an open patch where everyone who's joined
  * waddles about, bumps and quacks, getting used to the controls before the
- * first question. The camera follows your duck (or shows the whole patch).
+ * first question. In team mode each team has a corner: walk into one (or
+ * press its number) to join that team. The camera follows your duck (or
+ * shows the whole patch).
  */
 export function PlayerLobby({
   view,
@@ -260,26 +284,44 @@ export function PlayerLobby({
   feed: { current: ArenaFeed };
   onMove: (m: ArenaMove) => void;
 }) {
-  const layout = useMemo(() => lobbyLayout(), []);
+  const { layout, options, colors } = useLobby(view.settings);
   const members = useMembers(view.players);
   const source = useMemo(() => networkSource(feed), [feed]);
   const [overview, setOverview] = useState(false);
   const touch = useTouchScreen();
+  const mine = options.findIndex((o) => o.id === view.me.teamId);
   return (
     <div className="space-y-3">
       <ArenaView
         layout={layout}
-        options={[]}
+        options={options}
+        colors={colors}
         members={members}
         source={source}
         youId={view.me.id}
         reveal={null}
         overview={overview}
         onToggle={() => setOverview((v) => !v)}
-        current={null}
+        current={mine >= 0 ? mine : null}
         onMove={onMove}
+        zoneLabel="team"
       />
-      {!touch && <ArenaControls onMove={onMove} layout={layout} />}
+      {options.length > 0 && (
+        <p className="text-center text-lg font-semibold" aria-live="polite">
+          {mine >= 0 ? (
+            <>
+              You're on{" "}
+              <span className="rounded-lg px-2 py-0.5 text-white" style={{ background: colors?.[mine] }}>
+                {options[mine].text}
+              </span>
+              . Walk to another corner to switch.
+            </>
+          ) : (
+            "Walk into a team's corner to join it (or press its number)."
+          )}
+        </p>
+      )}
+      {!touch && <ArenaControls onMove={onMove} layout={layout} colors={colors} zoneLabel="team" />}
     </div>
   );
 }
@@ -287,18 +329,21 @@ export function PlayerLobby({
 /** The waiting room on the presenter's screen: everyone's ducks milling about. */
 export function HostLobbyArena({
   players,
+  settings,
   feed,
 }: {
   players: PublicPlayer[];
+  settings: RoomSettings;
   feed: { current: ArenaFeed };
 }) {
-  const layout = useMemo(() => lobbyLayout(), []);
+  const { layout, options, colors } = useLobby(settings);
   const members = useMembers(players);
   const source = useMemo(() => networkSource(feed), [feed]);
   return (
     <ArenaPanel
       layout={layout}
-      options={[]}
+      options={options}
+      colors={colors}
       members={members}
       source={source}
       reveal={null}

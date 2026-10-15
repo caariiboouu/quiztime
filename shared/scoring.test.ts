@@ -5,6 +5,7 @@ import {
   placementPoints,
   rankBy,
   speedBonus,
+  levelPoints,
   teamStandings,
 } from "./scoring";
 
@@ -68,7 +69,7 @@ describe("numericAwards", () => {
 });
 
 describe("teamStandings", () => {
-  it("averages per member so big teams don't win by size", () => {
+  it("adds up members by default, or averages them", () => {
     const teams = [
       { id: "big", name: "Big", color: "#000000" },
       { id: "small", name: "Small", color: "#ffffff" },
@@ -84,16 +85,29 @@ describe("teamStandings", () => {
       duckHolderId: null,
       outfit: null,
     });
-    const s = teamStandings(teams, [
-      p("a", "big", 10),
-      p("b", "big", 10),
-      p("c", "big", 10),
-      p("d", "small", 25),
+    const players = [p("a", "big", 10), p("b", "big", 10), p("c", "big", 10), p("d", "small", 25)];
+    // By default every member's points count toward the team.
+    expect(teamStandings(teams, players).map((t) => [t.id, t.score, t.members])).toEqual([
+      ["big", 30, 3],
+      ["small", 25, 1],
+      ["empty", 0, 0],
     ]);
-    expect(s.map((t) => [t.id, t.score, t.members])).toEqual([
+    // Averaged, the bigger team doesn't win on numbers alone.
+    expect(teamStandings(teams, players, "average").map((t) => [t.id, t.score, t.members])).toEqual([
       ["small", 25, 1],
       ["big", 10, 3],
       ["empty", 0, 0],
     ]);
+  });
+});
+
+describe("levelPoints", () => {
+  it("spreads points evenly from the top level down to zero", () => {
+    expect([0, 1, 2, 3, 4].map((l) => levelPoints(l, 5, 100))).toEqual([100, 75, 50, 25, 0]);
+    expect([0, 1, 2].map((l) => levelPoints(l, 3, 90))).toEqual([90, 45, 0]);
+  });
+  it("clamps out-of-range levels", () => {
+    expect(levelPoints(-1, 5, 100)).toBe(100);
+    expect(levelPoints(9, 5, 100)).toBe(0);
   });
 });

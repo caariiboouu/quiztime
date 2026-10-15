@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type { WrittenQuestion } from "../../shared/protocol";
+import { DEFAULT_DEBATE_LEVELS, type DebateQuestion, type WrittenQuestion } from "../../shared/protocol";
 import {
+  buildDebateRequest,
   buildJudgeRequest,
+  combineDebateAnswers,
   combineJudgeAnswers,
   judgeAll,
   judgeWritten,
@@ -143,5 +145,84 @@ describe("judgeAll", () => {
     await judgeAll(cfg(f as unknown as typeof fetch), Q, items, (id) => void seen.push(id), 3);
     expect(seen.sort()).toEqual(items.map((i) => i.playerId).sort());
     expect(peak).toBeLessThanOrEqual(3);
+  });
+});
+
+const D: DebateQuestion = {
+  type: "debate",
+  id: "d1",
+  prompt: "Pineapple belongs on pizza",
+  levels: [...DEFAULT_DEBATE_LEVELS],
+  points: 100,
+  sides: { for: "Yes", against: "No way" },
+};
+
+function debateResponse(strength: number, over: { conf?: number; onSide?: number; manipulation?: number } = {}): JevResponse {
+  return {
+    model: "jev-1.13.0",
+    answers: {
+      strength: { type: "score", score: strength, confidence: over.conf ?? 0.9 },
+      on_side: { type: "noul", noul: over.onSide ?? 1 },
+      manipulation: { type: "noul", noul: over.manipulation ?? 0 },
+    },
+  };
+}
+
+describe("buildDebateRequest", () => {
+  it("judges the argument for its side, one rung per verdict, worst first", () => {
+    const req = buildDebateRequest("jev-1.13.0", D, "against", "Fruit is for dessert");
+    expect(req.state).toEqual({
+      motion: D.prompt,
+      side: "No way (arguing against the motion)",
+      argument: "Fruit is for dessert",
+    });
+    expect(Object.keys(req.questions).sort()).toEqual(["manipulation", "on_side", "strength"]);
+    const strength = req.questions.strength as { type: string; criteria: string[] };
+    expect(strength.type).toBe("score");
+    expect(strength.criteria).toHaveLength(5);
+    // Judged on reasoning, not on agreeing with the side or spelling.
+    expect(JSON.stringify(strength)).toMatch(/not whether you agree/);
+    expect(JSON.stringify(strength)).toMatch(/Ignore spelling/);
+  });
+
+  it("uses the host's own verdict labels", () => {
+    const q = { ...D, levels: ["Knockout", "Solid", "Weak"] };
+    const strength = buildDebateRequest("m", q, "for", "x").questions.strength as { criteria: string[] };
+    expect(strength.criteria).toEqual(["Weak", "Solid", "Knockout"]);
+  });
+});
+
+describe("combineDebateAnswers", () => {
+  it("maps Jev's strength onto the verdicts, best first", () => {
+    expect(combineDebateAnswers(D, debateResponse(4))).toMatchObject({ level: 0, suggestedPoints: 100, flags: [] });
+    expect(combineDebateAnswers(D, debateResponse(2.4))).toMatchObject({ level: 2, suggestedPoints: 50 });
+    expect(combineDebateAnswers(D, debateResponse(0))).toMatchObject({ level: 4, suggestedPoints: 0 });
+  });
+
+  it("flags low confidence, arguing the other side, and talking to the judge", () => {
+    const r = combineDebateAnswers(D, debateResponse(3, { conf: 0.2, onSide: 0.1, manipulation: 0.9 }));
+    expect(r.flags).toHaveLength(3);
+    expect(r.flags.join(" ")).toMatch(/other side/);
+  });
+
+  it("throws on a response without a strength score", () => {
+    expect(() => combineDebateAnswers(D, { model: "m", answers: {} })).toThrow(/strength/);
+  });
+});
+
+describe("judgeWritten on a debate", () => {
+  it("sends the side and returns a verdict", async () => {
+    const f = vi.fn(async () => new Response(JSON.stringify(debateResponse(3)), { status: 200 }));
+    const r = await judgeWritten(cfg(f as unknown as typeof fetch), D, "Sweet and salty works", "for");
+    expect(r).toMatchObject({ status: "ok", level: 1 });
+    const body = JSON.parse((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect(body.state.side).toBe("Yes (arguing for the motion)");
+  });
+
+  it("gives a blank argument the lowest verdict without calling Jev", async () => {
+    const f = vi.fn();
+    const r = await judgeWritten(cfg(f as unknown as typeof fetch), D, " ", "for");
+    expect(r).toMatchObject({ status: "skipped", level: 4 });
+    expect(f).not.toHaveBeenCalled();
   });
 });

@@ -92,11 +92,48 @@ export type PollQuestion = {
   arena?: boolean;
 };
 
+/**
+ * Debate: players pick a side of the motion (for or against) and argue it in
+ * a few hundred characters. Jev rates how strong the argument is for the side
+ * they picked, not whether it agrees with anyone; the host confirms. Like
+ * written answers there's no timer and no speed bonus.
+ *
+ * `levels` are the possible verdicts, best first ("very good argument" …
+ * "very poor argument"). The best earns `points`, the worst 0, and the rest
+ * fall evenly in between. On the stage the levels show only as pedestal
+ * heights; the labels stay on the host's review screen.
+ */
+export type DebateQuestion = {
+  type: "debate";
+  id: string;
+  prompt: string;
+  /** 3–8 verdicts, best first. Defaults to DEFAULT_DEBATE_LEVELS. */
+  levels: string[];
+  points: number;
+  /** What the two sides are called on screen. Default "For" / "Against". */
+  sides?: { for: string; against: string };
+  maxLength?: number;
+};
+
+export type DebateSide = "for" | "against";
+
+export const DEFAULT_DEBATE_LEVELS = [
+  "Very good argument",
+  "Good argument",
+  "Neutral",
+  "Poor argument",
+  "Very poor argument",
+];
+export const MIN_DEBATE_LEVELS = 3;
+export const MAX_DEBATE_LEVELS = 8;
+export const MAX_DEBATE_LENGTH = 500;
+
 export type LiveQuestion =
   | ChoiceQuestion
   | NumericQuestion
   | WrittenQuestion
-  | PollQuestion;
+  | PollQuestion
+  | DebateQuestion;
 
 export type MinigameId = "duck-stop" | "pond-memory";
 
@@ -165,9 +202,22 @@ export type Show = {
 
 export type Team = { id: string; name: string; color: string };
 
+/**
+ * How team mode adds up a team's score:
+ *  total   – every member's points count toward the team (the default)
+ *  average – points per member, so a bigger team doesn't win by numbers
+ */
+export type TeamScoring = "total" | "average";
+
+/** Team mode has 2–4 teams: one per side of the lobby. */
+export const MIN_TEAMS = 2;
+export const MAX_TEAMS = 4;
+
 export type RoomSettings = {
   teamMode: boolean;
   teams: Team[];
+  /** How team scores add up. Default "total". */
+  teamScoring?: TeamScoring;
   /** Scoring for choice questions that don't set their own. */
   choiceScoring: ScoringMode;
   /** Default max speed bonus for speed-scored choice questions. */
@@ -203,6 +253,8 @@ export type AnswerValue =
   | { type: "numeric"; value: number }
   | { type: "written"; text: string }
   | { type: "poll"; optionId: string }
+  /** A side with no text yet is a draft: the duck has crossed over, nothing's argued. */
+  | { type: "debate"; side: DebateSide; text: string }
   | { type: "minigame"; score: number };
 
 export type Submission = {
@@ -220,6 +272,8 @@ export type JudgeResult = {
   criteria: { text: string; p: number }[];
   /** 0–4 overall quality score, if available. */
   quality?: number;
+  /** Debate: the verdict Jev suggests, as an index into the question's levels (0 = best). */
+  level?: number;
   qualityConfidence?: number;
   /** Probability the answer tries to talk to/steer the grader. */
   manipulation?: number;
@@ -266,7 +320,7 @@ export type PublicPlayer = {
 };
 
 export type TeamStanding = Team & {
-  /** Average score per member, so team size doesn't decide the winner. */
+  /** The members' total, or their average (see TeamScoring). */
   score: number;
   members: number;
 };
@@ -292,6 +346,8 @@ export type PublicSegment = {
   arena?: { players: number };
   answeredCount: number;
   eligibleCount: number;
+  /** Debate: which side each player's duck is on (their arguments stay private). */
+  sides?: Record<string, DebateSide>;
   question?: PublicQuestion;
   minigame?: { game: MinigameId; seed: number; durationSec: number; points: number };
   /** Filled once revealed. */
@@ -302,7 +358,9 @@ export type PublicQuestion =
   | Omit<ChoiceQuestion, "correctId" | "factoid">
   | Omit<NumericQuestion, "answer" | "factoid">
   | Omit<WrittenQuestion, "referenceAnswer" | "rubric">
-  | PollQuestion;
+  | PollQuestion
+  /** The verdict labels stay with the host; players see pedestals, not labels. */
+  | (Omit<DebateQuestion, "levels"> & { levelCount: number });
 
 export type SegmentReveal = {
   correctId?: string;
@@ -312,6 +370,9 @@ export type SegmentReveal = {
   referenceAnswer?: string;
   /** Option id → number of picks (choice and poll). */
   distribution?: Record<string, number>;
+  /** Debate: each player's verdict (0 = best of `levelCount`), for pedestal heights. */
+  levels?: Record<string, number>;
+  levelCount?: number;
   /** Points awarded this segment, highest first. */
   awards: { playerId: string; name: string; points: number; detail?: string }[];
   /** On the last question of a lightning round: totals for the whole round. */
@@ -359,6 +420,8 @@ export type HostSubmission = {
   judge?: JudgeResult;
   /** Host's final points for a written answer (defaults to Jev's suggestion). */
   finalPoints?: number;
+  /** Debate: the host's verdict (defaults to Jev's suggested level). */
+  finalLevel?: number;
 };
 
 export type HostView = {
@@ -402,6 +465,10 @@ export type HostMessage =
   | { t: "showLeaderboard" }
   | { t: "end" }
   | { t: "setFinalPoints"; playerId: string; points: number }
+  /** Debate: the verdict for one argument (index into the levels, 0 = best). */
+  | { t: "setLevel"; playerId: string; level: number }
+  /** Lobby, team mode: even the teams out by moving random ducks across. */
+  | { t: "balanceTeams" }
   | { t: "rejudge" }
   | { t: "kick"; playerId: string }
   | { t: "qnaModerate"; id: string; answered?: boolean; hidden?: boolean };
@@ -438,7 +505,8 @@ export type CreateRoomResponse = { code: string; hostKey: string };
 /** Join a room as an account (your name, Duck Hours entry and outfit come from it). */
 export type JoinRequest = {
   account: { id: string; token: string };
-  teamId: string | null;
+  /** Team mode: optional. Players usually pick a team by walking their duck into it. */
+  teamId?: string | null;
 };
 
 // ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import type {
   PublicPlayer,
   PublicQna,
   PublicSegment,
+  TeamScoring,
   TeamStanding,
 } from "../../shared/protocol";
 import { ARROW, useControls, type Control } from "./controls";
@@ -163,12 +164,14 @@ export function Leaderboard({
   players,
   teams,
   teamMode,
+  teamScoring = "total",
   highlightId,
   limit = 10,
 }: {
   players: PublicPlayer[];
   teams: TeamStanding[];
   teamMode: boolean;
+  teamScoring?: TeamScoring;
   highlightId?: string;
   limit?: number;
 }) {
@@ -177,8 +180,8 @@ export function Leaderboard({
   const top = players.slice(0, limit);
   const me = highlightId ? players.findIndex((p) => p.id === highlightId) : -1;
   return (
-    <div className={`grid gap-6 ${teamMode ? "md:grid-cols-[2fr_1fr]" : ""}`}>
-      <ol className="space-y-2">
+    <div className={`grid gap-6 ${teamMode ? "md:grid-cols-[1fr_1fr]" : ""}`}>
+      <ol className={`space-y-2 ${teamMode ? "md:order-2" : ""}`}>
         {top.map((p, i) => (
           <PlayerRow
             key={p.id}
@@ -204,16 +207,18 @@ export function Leaderboard({
           </li>
         )}
       </ol>
+      {/* In team mode the teams are what win, so they come first. */}
       {teamMode && (
-        <div>
+        <div className="md:order-1">
           <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">
-            Teams (avg per member)
+            Teams {teamScoring === "average" ? "(average per member)" : "(everyone's points)"}
           </h3>
           <ol className="space-y-2">
             {teams.map((t, i) => (
               <li
                 key={t.id}
-                className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-white p-3"
+                className="flex items-center gap-3 rounded-xl border-2 bg-white p-3 text-lg"
+                style={{ borderColor: t.color }}
               >
                 <span className="w-6 text-center font-semibold text-neutral-400">{i + 1}</span>
                 <span className="h-4 w-4 rounded-full" style={{ background: t.color }} />

@@ -10,8 +10,9 @@ import type {
   Show,
   ShowSegment,
   Team,
+  TeamScoring,
 } from "../../shared/protocol";
-import { MINIGAME_COUNTDOWN_SEC } from "../../shared/protocol";
+import { MAX_TEAMS, MIN_TEAMS, MINIGAME_COUNTDOWN_SEC } from "../../shared/protocol";
 import {
   createRoom,
   joinLink,
@@ -45,6 +46,9 @@ import { hasWebGL } from "./minigames/three/fallbackContext";
 import { MINIGAMES } from "./minigames";
 import { useRoom, useServerNow, type ArenaFeed } from "./useRoom";
 import { HostArena, HostLobbyArena } from "./arena/ArenaViews";
+import { DebatePanel } from "./debate/DebatePanel";
+import { debateNames } from "./debate/debateLayout";
+import { levelPoints } from "../../shared/scoring";
 
 const DEFAULT_TEAMS: Team[] = [
   { id: "mallards", name: "Mallards", color: "#16a34a" },
@@ -94,7 +98,9 @@ function HostSetup({
   const [saved, setSaved] = useState<SavedShow | null>(null);
   const [draft, setDraft] = useState<Show>(sampleShow as Show);
   const [teamMode, setTeamMode] = useState(false);
-  const [teams, setTeams] = useState<Team[]>(DEFAULT_TEAMS);
+  // Two teams to start with; "Add team" brings in the other defaults.
+  const [teams, setTeams] = useState<Team[]>(DEFAULT_TEAMS.slice(0, MIN_TEAMS));
+  const [teamScoring, setTeamScoring] = useState<TeamScoring>("total");
   const [choiceScoring, setChoiceScoring] = useState<ScoringMode>("accuracy");
   const [speedBonusMax, setSpeedBonusMax] = useState(50);
   const [arena, setArena] = useState(true);
@@ -172,6 +178,7 @@ function HostSetup({
     const settings: RoomSettings = {
       teamMode,
       teams: teamMode ? teams : [],
+      teamScoring,
       choiceScoring,
       speedBonusMax,
       arena,
@@ -359,10 +366,35 @@ function HostSetup({
               checked={teamMode}
               onChange={(e) => setTeamMode(e.target.checked)}
             />
-            Play in teams (team score = average per member)
+            Play in teams
           </label>
           {teamMode && (
             <div className="space-y-2">
+              <p className="text-sm text-neutral-600">
+                Each team gets a corner of the lobby; players walk their duck into one to join it, and
+                you can auto-balance before starting. Every question counts toward the team's score.
+              </p>
+              <fieldset className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+                <legend className="sr-only">Team score</legend>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="teamScoring"
+                    checked={teamScoring === "total"}
+                    onChange={() => setTeamScoring("total")}
+                  />
+                  Team score = everyone's points added up
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="teamScoring"
+                    checked={teamScoring === "average"}
+                    onChange={() => setTeamScoring("average")}
+                  />
+                  Average per member (fairer if teams are uneven)
+                </label>
+              </fieldset>
               {teams.map((t, i) => (
                 <div key={t.id} className="flex items-center gap-2">
                   <input
@@ -385,7 +417,7 @@ function HostSetup({
                   />
                   <button
                     type="button"
-                    disabled={teams.length <= 2}
+                    disabled={teams.length <= MIN_TEAMS}
                     onClick={() => setTeams(teams.filter((_, j) => j !== i))}
                     className="rounded-md px-2 py-1 text-sm text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
                   >
@@ -393,13 +425,17 @@ function HostSetup({
                   </button>
                 </div>
               ))}
-              {teams.length < 8 && (
+              {teams.length < MAX_TEAMS && (
                 <button
                   type="button"
                   onClick={() =>
                     setTeams([
                       ...teams,
-                      { id: `team-${Date.now().toString(36)}`, name: `Team ${teams.length + 1}`, color: "#64748b" },
+                      DEFAULT_TEAMS.find((d) => !teams.some((t) => t.id === d.id)) ?? {
+                        id: `team-${Date.now().toString(36)}`,
+                        name: `Team ${teams.length + 1}`,
+                        color: "#64748b",
+                      },
                     ])
                   }
                   className="text-sm font-medium text-neutral-700 underline"
@@ -434,7 +470,7 @@ function segmentLabel(s: ShowSegment): string {
   if (s.kind === "lightning") {
     return `⚡ ${s.title ?? "Lightning round"}: ${s.questions.length} questions, ${s.timeLimitSec}s each`;
   }
-  const icon = { choice: "🔘", numeric: "🔢", written: "✍️", poll: "📊" }[s.question.type];
+  const icon = { choice: "🔘", numeric: "🔢", written: "✍️", poll: "📊", debate: "🗣️" }[s.question.type];
   return `${icon} ${s.question.prompt}`;
 }
 
@@ -692,7 +728,8 @@ function HostStage({
   if (view.phase === "lobby") {
     return (
       <div className="space-y-8 text-center">
-        <LobbyArea players={view.players} feed={feed} />
+        <LobbyArea players={view.players} settings={view.settings} feed={feed} />
+        {view.settings.teamMode && view.teams.length >= 2 && <TeamBar view={view} send={send} />}
         <div>
           <p className="text-lg text-neutral-600">Join at</p>
           <p className="break-all text-2xl font-semibold text-neutral-900">{link}</p>
@@ -723,6 +760,10 @@ function HostStage({
     // anyone has points).
     const top = view.players[0]?.score > 0 ? view.players[0] : null;
     const topCrowned = top?.duckHolderId != null && top.duckHolderId === duckHoursLeader();
+    // Team mode: a team out in front on its own (not tied) gets the headline.
+    const [t1, t2] = view.teams;
+    const teamLead =
+      view.settings.teamMode && t1 && t1.score > 0 && (!t2 || t1.score > t2.score) ? t1 : null;
     return (
       <div className="space-y-8">
         <Mascot
@@ -735,13 +776,24 @@ function HostStage({
         <h2 className="text-center text-4xl font-black">
           {view.phase === "ended" ? "🏆 Final standings" : "Leaderboard"}
         </h2>
-        {top && (
-          <p className="-mt-6 text-center text-lg font-semibold text-neutral-600">
-            {view.phase === "ended" ? `${top.name} wins!` : `${top.name} is in the lead`}
+        {teamLead ? (
+          <p className="-mt-6 text-center text-2xl font-bold" style={{ color: teamLead.color }}>
+            {view.phase === "ended" ? `${teamLead.name} win!` : `${teamLead.name} are in the lead`}
           </p>
+        ) : (
+          top && (
+            <p className="-mt-6 text-center text-lg font-semibold text-neutral-600">
+              {view.phase === "ended" ? `${top.name} wins!` : `${top.name} is in the lead`}
+            </p>
+          )
         )}
         {view.phase === "ended" && <QuizPodium players={view.players} />}
-        <Leaderboard players={view.players} teams={view.teams} teamMode={view.settings.teamMode} />
+        <Leaderboard
+          players={view.players}
+          teams={view.teams}
+          teamMode={view.settings.teamMode}
+          teamScoring={view.settings.teamScoring}
+        />
         {view.phase === "ended" && <DuckHoursPanel view={view} send={send} />}
       </div>
     );
@@ -855,6 +907,17 @@ function HostQuestion({
         </p>
       )}
 
+      {q.type === "debate" && (
+        <DebatePanel
+          players={view.players}
+          sides={seg.sides ?? {}}
+          names={debateNames(q.sides)}
+          levels={revealed ? seg.reveal?.levels : undefined}
+          levelCount={seg.reveal?.levelCount}
+          teams={view.settings.teamMode ? view.settings.teams : undefined}
+        />
+      )}
+
       {seg.stage === "open" && <AnsweredCount view={view} />}
       {seg.stage === "closed" && <p className="text-center text-neutral-600">Answers locked.</p>}
 
@@ -862,8 +925,22 @@ function HostQuestion({
         <WrittenReview view={view} send={send} />
       )}
 
+      {q.type === "debate" && (seg.stage === "judging" || seg.stage === "review") && (
+        <DebateReview view={view} send={send} levels={q.levels} names={debateNames(q.sides)} />
+      )}
+
       {revealed && (
         <>
+          {q.type === "debate" && (
+            <details className="mx-auto max-w-3xl rounded-2xl bg-white p-4 shadow-sm">
+              <summary className="cursor-pointer text-sm font-semibold text-neutral-600">
+                Change a verdict (the pedestals and points follow)
+              </summary>
+              <div className="mt-3">
+                <DebateReview view={view} send={send} levels={q.levels} names={debateNames(q.sides)} />
+              </div>
+            </details>
+          )}
           {q.type !== "poll" && "factoid" in q && q.factoid && (
             <p className="mx-auto max-w-2xl text-center text-lg text-neutral-700">💡 {q.factoid}</p>
           )}
@@ -1032,6 +1109,132 @@ function ReviewRow({
   );
 }
 
+function DebateReview({
+  view,
+  send,
+  levels,
+  names,
+}: {
+  view: HostView;
+  send: Send;
+  levels: string[];
+  names: { for: string; against: string };
+}) {
+  const seg = view.segment!;
+  const full = view.fullSegment as Extract<Segment, { kind: "question" }>;
+  const max = full.question.type === "debate" ? full.question.points : 0;
+  const subs = view.submissions.filter((s) => s.value.type === "debate" && s.value.text.trim());
+  const judged = subs.filter((s) => s.judge).length;
+  const judging = seg.stage === "judging";
+  const revealed = seg.stage === "revealed";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-neutral-700">
+          {judging
+            ? `Jev is weighing the arguments… ${judged} / ${subs.length}`
+            : revealed
+              ? "Pick a different verdict and that duck's pedestal and points change."
+              : view.judgeConfigured
+                ? "Check Jev's verdicts, change any that look off, then reveal. Players only see pedestals, not these labels."
+                : "Jev isn't configured on the server, so pick a verdict for each argument."}
+        </p>
+        {!judging && !revealed && view.judgeConfigured && (
+          <button
+            type="button"
+            onClick={() => send({ t: "rejudge" })}
+            className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm hover:bg-neutral-100"
+          >
+            Re-judge all
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-amber-800">
+        Arguments and verdicts below are visible to anyone watching your screen.
+      </p>
+      <ul className="space-y-3">
+        {subs.map((s) => (
+          <DebateRow key={s.playerId} sub={s} levels={levels} max={max} names={names} disabled={judging} send={send} />
+        ))}
+        {subs.length === 0 && <li className="text-neutral-500">Nobody made an argument.</li>}
+      </ul>
+    </div>
+  );
+}
+
+function DebateRow({
+  sub,
+  levels,
+  max,
+  names,
+  disabled,
+  send,
+}: {
+  sub: HostSubmission;
+  levels: string[];
+  max: number;
+  names: { for: string; against: string };
+  disabled: boolean;
+  send: Send;
+}) {
+  if (sub.value.type !== "debate") return null;
+  const j = sub.judge;
+  const suggested = j?.status === "ok" ? j.level : undefined;
+  const middle = Math.floor((levels.length - 1) / 2);
+  const current = sub.finalLevel ?? suggested ?? middle;
+  const side = sub.value.side;
+
+  return (
+    <li className="rounded-xl border border-neutral-200 bg-white p-4">
+      <div className="flex flex-wrap items-baseline gap-2">
+        <p className="font-semibold">{sub.name}</p>
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs font-bold text-white ${side === "for" ? "bg-sky-600" : "bg-rose-600"}`}
+        >
+          {side === "for" ? names.for : names.against}
+        </span>
+      </div>
+      <p className="mt-1 whitespace-pre-wrap break-words text-neutral-800">{sub.value.text}</p>
+      {j && (
+        <div className="mt-2 space-y-1 text-sm">
+          {j.status === "ok" && suggested !== undefined && (
+            <p className="text-neutral-600">
+              Jev says <strong>{levels[suggested]}</strong>
+              {j.qualityConfidence !== undefined && ` (confidence ${Math.round(j.qualityConfidence * 100)}%)`}
+              {sub.finalLevel !== undefined && sub.finalLevel !== suggested && " · changed by you"}
+            </p>
+          )}
+          {j.flags.map((f) => (
+            <p key={f} className="text-amber-800">
+              ⚠ {f}
+            </p>
+          ))}
+          {j.error && <p className="text-xs text-rose-700">{j.error}</p>}
+        </div>
+      )}
+      <div className="mt-3 flex flex-wrap gap-1.5" role="radiogroup" aria-label={`Verdict for ${sub.name}`}>
+        {levels.map((label, i) => (
+          <button
+            key={label}
+            type="button"
+            role="radio"
+            aria-checked={current === i}
+            disabled={disabled}
+            onClick={() => send({ t: "setLevel", playerId: sub.playerId, level: i })}
+            className={`rounded-lg border px-2.5 py-1 text-sm disabled:opacity-50 ${
+              current === i ? "border-neutral-900 bg-neutral-900 font-semibold text-white" : "border-neutral-300 hover:bg-neutral-100"
+            }`}
+          >
+            {label} <span className="opacity-60">· {levelPoints(i, levels.length, max)}</span>
+            {suggested === i && <span title="Jev's verdict"> ✦</span>}
+          </button>
+        ))}
+      </div>
+    </li>
+  );
+}
+
 function HostMinigame({ view, offsetMs }: { view: HostView; offsetMs: number }) {
   const now = useServerNow(offsetMs);
   const seg = view.segment!;
@@ -1186,7 +1389,51 @@ function DuckHoursPanel({ view, send }: { view: HostView; send: Send }) {
  * waiting-room patch as players try out the controls on their phones.
  * Before anyone's connected (or without WebGL), the mascot holds the stage.
  */
-function LobbyArea({ players, feed }: { players: HostView["players"]; feed: { current: ArenaFeed } }) {
+function LobbyArea({
+  players,
+  settings,
+  feed,
+}: {
+  players: HostView["players"];
+  settings: HostView["settings"];
+  feed: { current: ArenaFeed };
+}) {
   if (!players.some((p) => p.connected) || !hasWebGL()) return <Mascot animation="dance" size={220} />;
-  return <HostLobbyArena players={players} feed={feed} />;
+  return <HostLobbyArena players={players} settings={settings} feed={feed} />;
+}
+
+/**
+ * Team mode, lobby: how many ducks stand in each corner, and a button that
+ * evens the teams out by sending random ducks across.
+ */
+function TeamBar({ view, send }: { view: HostView; send: Send }) {
+  const counts = view.teams.map((t) => view.players.filter((p) => p.teamId === t.id).length);
+  const unteamed = view.players.filter((p) => !p.teamId).length;
+  const spread = Math.max(...counts) - Math.min(...counts);
+  const balanced = spread <= 1 && unteamed === 0;
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-2">
+      {view.teams.map((t, i) => (
+        <span
+          key={t.id}
+          className="flex items-center gap-2 rounded-full border-2 bg-white px-4 py-1.5 text-lg font-semibold"
+          style={{ borderColor: t.color }}
+        >
+          <span className="h-3 w-3 rounded-full" style={{ background: t.color }} />
+          {t.name}
+          <span className="tabular-nums text-neutral-500">{counts[i]}</span>
+        </span>
+      ))}
+      {unteamed > 0 && <span className="text-sm text-neutral-500">{unteamed} still choosing</span>}
+      <button
+        type="button"
+        onClick={() => send({ t: "balanceTeams" })}
+        disabled={balanced || view.players.length < 2}
+        title={balanced ? "The teams are already even" : "Move random ducks across until the teams are even"}
+        className="rounded-lg border border-neutral-300 bg-white px-4 py-1.5 font-semibold hover:bg-neutral-100 disabled:opacity-40"
+      >
+        ⚖ Auto-balance
+      </button>
+    </div>
+  );
 }

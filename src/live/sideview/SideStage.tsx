@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Vector3, type Group, type OrthographicCamera } from "three";
+import { Vector3, type Group, type Mesh, type OrthographicCamera } from "three";
 import {
   makeSideBody,
   sideDrop,
@@ -28,7 +28,13 @@ export type StagePlatform = Platform & {
   color?: string;
   /** Blocks: where the bottom is (they stand on something). */
   base?: number;
+  /** Blocks: grow up from `base` to `y` over this many seconds (ducks on top ride up). */
+  rise?: number;
+  /** …starting this many seconds after it appears. */
+  riseDelay?: number;
 };
+
+type Rise = { from: number; to: number; start: number; dur: number };
 
 export type StageDuck = { id: string; look: DuckLook; bare?: boolean; crowned?: boolean };
 
@@ -68,6 +74,8 @@ export default function SideStage({
   renderTag,
   onSelect,
   tagLabel,
+  walkShuffles = false,
+  background = "#e8f4ec",
   className = "",
 }: {
   platforms: StagePlatform[];
@@ -80,6 +88,9 @@ export default function SideStage({
   renderTag?: (id: string) => React.ReactNode;
   onSelect?: (id: string) => void;
   tagLabel?: (id: string) => string;
+  /** Ducks whose home moves a little along the same platform walk there instead of flying. */
+  walkShuffles?: boolean;
+  background?: string;
   className?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -99,7 +110,7 @@ export default function SideStage({
   return (
     <div ref={box} className={`relative w-full overflow-hidden ${className}`} style={{ height }}>
       <Canvas aria-hidden dpr={[1, 1.75]} orthographic camera={{ near: 0.1, far: 400, zoom }}>
-        <color attach="background" args={["#e8f4ec"]} />
+        <color attach="background" args={[background]} />
         <hemisphereLight args={["#ffffff", "#8a9a8a", 1.3]} />
         <directionalLight position={[3, 8, 10]} intensity={1.6} />
         <StageCamera zoom={zoom} view={view} />
@@ -110,6 +121,7 @@ export default function SideStage({
           view={view}
           meId={meId}
           controls={controls}
+          walkShuffles={walkShuffles}
           tagRefs={tagRefs}
         />
       </Canvas>
@@ -160,6 +172,7 @@ function Stage({
   view,
   meId,
   controls,
+  walkShuffles,
   tagRefs,
 }: {
   platforms: StagePlatform[];
@@ -168,6 +181,7 @@ function Stage({
   view: StageView;
   meId: string | null;
   controls: boolean;
+  walkShuffles: boolean;
   tagRefs: React.RefObject<Map<string, HTMLButtonElement>>;
 }) {
   const clock = useThree((s) => s.clock);
@@ -184,6 +198,26 @@ function Stage({
   const colorOf = useMemo(() => new Map(ducks.map((d) => [d.id, d.look.feather])), [ducks]);
   const bounds = useMemo(() => ({ minX: view.minX + 0.4, maxX: view.maxX - 0.4 }), [view]);
 
+  // The platforms as they stand right now: rising blocks grow from their base.
+  const live = useRef<Platform[]>([]);
+  const rises = useRef<(Rise | null)[]>([]);
+  // A layout effect, so it's in place before the homes effect below uses it.
+  useLayoutEffect(() => {
+    const t = clock.elapsedTime;
+    const before = live.current;
+    live.current = platforms.map((p, i) => {
+      const old = before[i];
+      const same = old && old.x0 === p.x0 && old.x1 === p.x1;
+      const from = same ? old.y : p.rise ? (p.base ?? p.y) : p.y;
+      const going = same ? rises.current[i] : null;
+      // Already on its way there: carry on (a re-render isn't a new rise).
+      if (!going || going.to !== p.y)
+        rises.current[i] = from === p.y ? null : { from, to: p.y, start: t + (p.riseDelay ?? 0), dur: p.rise ?? 0.6 };
+      return { x0: p.x0, x1: p.x1, y: from, solid: p.solid };
+    });
+    rises.current.length = platforms.length;
+  }, [platforms, clock]);
+
   // Everyone starts at home; when their home moves (standings changed), off they go.
   useEffect(() => {
     const ids = new Set(ducks.map((d) => d.id));
@@ -195,17 +229,19 @@ function Stage({
       lastHomes.current.set(d.id, home);
       let b = bodies.current.get(d.id);
       if (!b) {
-        b = makeSideBody(d.id, home.x, platforms, home.ground);
+        b = makeSideBody(d.id, home.x, live.current, home.ground);
         bodies.current.set(d.id, b);
-      } else if (d.id !== meId && was && (was.x !== home.x || was.ground !== home.ground)) {
-        sideFlyTo(b, home.x, platforms, home.ground, clock.elapsedTime);
+      } else if (!(controls && d.id === meId) && was && (was.x !== home.x || was.ground !== home.ground)) {
+        // A shuffle along the same platform is a walk; anything further, a flight.
+        if (walkShuffles && was.ground === home.ground && b.ground === home.ground && Math.abs(home.x - b.x) < 1.6) b.tx = home.x;
+        else sideFlyTo(b, home.x, live.current, home.ground, clock.elapsedTime);
       }
       if (!sched.current.has(d.id)) {
         const base = POSES[hash(d.id) % POSES.length];
         sched.current.set(d.id, { base, anim: base, held: true, until: clock.elapsedTime + 2 + (hash(d.id) % 900) / 100 });
       }
     }
-  }, [ducks, homes, platforms, meId, clock]);
+  }, [ducks, homes, platforms, meId, controls, walkShuffles, clock]);
 
   const me = () => (meId ? bodies.current.get(meId) : undefined);
   const heldDirs = useRef<string[]>([]);
@@ -217,7 +253,7 @@ function Stage({
         if (c === "left") sideStep(b, -1);
         else if (c === "right") sideStep(b, 1);
         else if (c === "up") sideJump(b);
-        else if (c === "down") sideDrop(b, platforms, clock.elapsedTime);
+        else if (c === "down") sideDrop(b, live.current, clock.elapsedTime);
         else sideEmote(b, "quack", clock.elapsedTime, 1.2);
       },
       onHeld: (dirs) => {
@@ -236,7 +272,13 @@ function Stage({
   useFrame((_, dt) => {
     const t = clock.elapsedTime;
     const list = [...bodies.current.values()];
-    stepSide(list, platforms, dt, t, bounds);
+    rises.current.forEach((r, i) => {
+      if (!r) return;
+      const k = Math.max(0, Math.min(1, (t - r.start) / r.dur));
+      live.current[i].y = r.from + (r.to - r.from) * (k * k * (3 - 2 * k));
+      if (k >= 1) rises.current[i] = null;
+    });
+    stepSide(list, live.current, dt, t, bounds);
     const mine = me();
     for (const b of list) {
       // Knocked off their spot: back they go after a moment.
@@ -246,10 +288,10 @@ function Stage({
         const since = away.current.get(b.id);
         if (!off) away.current.delete(b.id);
         else if (since === undefined) away.current.set(b.id, t);
-        else if (t - since > (b.id === meId ? 25 : 1.6)) {
+        else if (t - since > (controls && b.id === meId ? 25 : 1.6)) {
           away.current.delete(b.id);
           if (b.ground === home.ground) b.tx = home.x;
-          else sideFlyTo(b, home.x, platforms, home.ground, t);
+          else sideFlyTo(b, home.x, live.current, home.ground, t);
         }
       }
       // Face the viewer, turned a little the way they last went; side-on
@@ -306,7 +348,7 @@ function Stage({
   return (
     <>
       {platforms.map((pl, i) => (
-        <PlatformMesh key={i} p={pl} />
+        <PlatformMesh key={i} p={pl} live={() => live.current[i]} />
       ))}
       <FeatherBursts apiRef={feathers} />
       {ducks.map((d) => (
@@ -342,19 +384,10 @@ function Stage({
   );
 }
 
-function PlatformMesh({ p }: { p: StagePlatform }) {
+function PlatformMesh({ p, live }: { p: StagePlatform; live: () => Platform | undefined }) {
   const w = p.x1 - p.x0;
   const cx = (p.x0 + p.x1) / 2;
-  if (p.style === "block") {
-    // A podium block, from its base up to its top.
-    const h = Math.max(0.2, p.y - (p.base ?? p.y - 1));
-    return (
-      <mesh position={[cx, p.y - h / 2, 0]}>
-        <boxGeometry args={[w, h, PLANK_DEPTH]} />
-        <meshLambertMaterial color={p.color ?? "#e8c25a"} />
-      </mesh>
-    );
-  }
+  if (p.style === "block") return <BlockMesh p={p} live={live} />;
   if (p.style === "floor") {
     return (
       <mesh position={[cx, p.y - 0.5, 0]}>
@@ -367,6 +400,27 @@ function PlatformMesh({ p }: { p: StagePlatform }) {
     <mesh position={[cx, p.y - 0.14, 0]}>
       <boxGeometry args={[w, 0.28, PLANK_DEPTH]} />
       <meshLambertMaterial color={p.color ?? "#c8955a"} />
+    </mesh>
+  );
+}
+
+/** A podium block, from its base up to its (possibly rising) top. */
+function BlockMesh({ p, live }: { p: StagePlatform; live: () => Platform | undefined }) {
+  const mesh = useRef<Mesh>(null);
+  const base = p.base ?? p.y - 1;
+  useFrame(() => {
+    const m = mesh.current;
+    if (!m) return;
+    const y = live()?.y ?? p.y;
+    const h = Math.max(0.02, y - base);
+    m.scale.y = h;
+    m.position.y = base + h / 2;
+    m.visible = y - base > 0.01;
+  });
+  return (
+    <mesh ref={mesh} position={[(p.x0 + p.x1) / 2, p.y, 0]}>
+      <boxGeometry args={[p.x1 - p.x0, 1, PLANK_DEPTH]} />
+      <meshLambertMaterial color={p.color ?? "#e8c25a"} />
     </mesh>
   );
 }

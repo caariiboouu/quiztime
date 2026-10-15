@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { DUCK_LENGTH, MIN_TRAVEL_DUCKS, arenaLayout, spawnPoint, zoneAt, zoneTarget } from "./arena";
+import {
+  DUCK_LENGTH,
+  MIN_TRAVEL_DUCKS,
+  arenaLayout,
+  spawnPoint,
+  teamLobbyLayout,
+  zoneAt,
+  zoneTarget,
+} from "./arena";
 
 import type { ArenaLayout } from "./arena";
 
@@ -84,5 +92,22 @@ describe("arena layout", () => {
         expect(zoneAt(l, t.x, t.z)).toBe(i);
       }
     }
+  });
+});
+
+describe("team lobby", () => {
+  it("gives each team a corner in the answer pad's directions, with no team in the middle", () => {
+    const two = teamLobbyLayout(2);
+    expect([LEFT(two), RIGHT(two)]).toEqual([0, 1]);
+    const four = teamLobbyLayout(4);
+    expect([UP, LEFT, RIGHT, DOWN].map((f) => f(four))).toEqual([0, 1, 2, 3]);
+    expect(zoneAt(four, 0, 0)).toBeNull();
+    // Ducks arrive in the no-team middle.
+    expect(four.spawn).toBeLessThan(four.neutral);
+  });
+
+  it("clamps to 2–4 teams", () => {
+    expect(teamLobbyLayout(1).options).toBe(2);
+    expect(teamLobbyLayout(9).options).toBe(4);
   });
 });

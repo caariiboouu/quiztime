@@ -1,11 +1,22 @@
 import { useState } from "react";
-import type { Show, ShowSegment } from "../../../shared/protocol";
+import {
+  DEFAULT_DEBATE_LEVELS,
+  MAX_DEBATE_LENGTH,
+  MAX_DEBATE_LEVELS,
+  MIN_DEBATE_LEVELS,
+  type DebateQuestion,
+  type Show,
+  type ShowSegment,
+} from "../../../shared/protocol";
+import { levelPoints } from "../../../shared/scoring";
 import {
   DEFAULT_POINTS,
   DEFAULT_SECONDS,
+  MAX_LEVEL_LABEL,
   MAX_OPTION,
   MAX_OPTIONS,
   MAX_PROMPT,
+  MAX_SIDE_NAME,
   blankQuestion,
   freeOptionId,
   isEditable,
@@ -14,7 +25,8 @@ import {
 
 /**
  * Edit the saved question set: title, and for each multiple-choice question
- * or poll its text, 2–4 answers (pick the correct one), points and seconds.
+ * or poll its text, 2–4 answers (pick the correct one), points and seconds;
+ * for a debate, its verdicts (best first), side names and points.
  * Other kinds of segment (minigames, lightning rounds, typed answers) come
  * from show files; here they can be moved or removed.
  */
@@ -59,7 +71,11 @@ export function QuestionEditor({
               total={show.segments.length}
               onMove={(by) => move(i, by)}
               onRemove={() => remove(i)}
-              title={isEditable(seg) ? (seg.question.type === "poll" ? "Poll" : "Multiple choice") : label(seg)}
+              title={
+                isEditable(seg)
+                  ? { poll: "Poll", choice: "Multiple choice", debate: "Debate" }[seg.question.type]
+                  : label(seg)
+              }
             >
               {isEditable(seg) && (
                 <QuestionFields
@@ -154,23 +170,85 @@ function SegmentCard({
 }
 
 function QuestionFields({ q, onChange }: { q: Editable; onChange: (q: Editable) => void }) {
-  const setType = (type: "choice" | "poll") => {
+  const blankOptions = [
+    { id: "a", text: "" },
+    { id: "b", text: "" },
+    { id: "c", text: "" },
+  ];
+  const setType = (type: Editable["type"]) => {
     if (type === q.type) return;
-    if (type === "poll") {
-      onChange({ type: "poll", id: q.id, prompt: q.prompt, options: q.options, arena: q.arena });
+    const options = q.type === "debate" ? blankOptions : q.options;
+    const arena = q.type === "debate" ? undefined : q.arena;
+    if (type === "debate") {
+      onChange({ type: "debate", id: q.id, prompt: q.prompt, levels: [...DEFAULT_DEBATE_LEVELS], points: DEFAULT_POINTS });
+    } else if (type === "poll") {
+      onChange({ type: "poll", id: q.id, prompt: q.prompt, options, arena });
     } else {
       onChange({
         type: "choice",
         id: q.id,
         prompt: q.prompt,
-        options: q.options,
-        arena: q.arena,
-        correctId: q.options[0].id,
+        options,
+        arena,
+        correctId: options[0].id,
         points: DEFAULT_POINTS,
         timeLimitSec: DEFAULT_SECONDS,
       });
     }
   };
+  const typeRadios = (
+    <div className="flex flex-wrap gap-3 text-sm">
+      {(
+        [
+          ["choice", "Multiple choice (one right answer)"],
+          ["poll", "Poll (no right answer)"],
+          ["debate", "Debate (argue for or against, judged by Jev)"],
+        ] as const
+      ).map(([type, text]) => (
+        <label key={type} className="flex items-center gap-1.5">
+          <input type="radio" name={`type-${q.id}`} checked={q.type === type} onChange={() => setType(type)} />
+          {text}
+        </label>
+      ))}
+    </div>
+  );
+  const prompt = (
+    <label className="block">
+      <span className="sr-only">Question</span>
+      <textarea
+        value={q.prompt}
+        maxLength={MAX_PROMPT}
+        rows={3}
+        placeholder={q.type === "debate" ? "The motion, e.g. “Ducks make better pets than cats”" : "Question"}
+        onChange={(e) => onChange({ ...q, prompt: e.target.value })}
+        // Grows to fit the question where browsers support it.
+        className="min-h-20 w-full rounded-md border border-neutral-300 px-3 py-2 [field-sizing:content]"
+      />
+    </label>
+  );
+  if (q.type === "debate") {
+    return (
+      <div className="space-y-3">
+        {typeRadios}
+        {prompt}
+        <DebateFields q={q} onChange={onChange} />
+      </div>
+    );
+  }
+  return <OptionFields q={q} onChange={onChange} typeRadios={typeRadios} prompt={prompt} />;
+}
+
+function OptionFields({
+  q,
+  onChange,
+  typeRadios,
+  prompt,
+}: {
+  q: Exclude<Editable, DebateQuestion>;
+  onChange: (q: Editable) => void;
+  typeRadios: React.ReactNode;
+  prompt: React.ReactNode;
+}) {
   const setOption = (id: string, text: string) =>
     onChange({ ...q, options: q.options.map((o) => (o.id === id ? { ...o, text } : o)) });
   const removeOption = (id: string) => {
@@ -182,38 +260,8 @@ function QuestionFields({ q, onChange }: { q: Editable; onChange: (q: Editable) 
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-3 text-sm">
-        <label className="flex items-center gap-1.5">
-          <input
-            type="radio"
-            name={`type-${q.id}`}
-            checked={q.type === "choice"}
-            onChange={() => setType("choice")}
-          />
-          Multiple choice (one right answer)
-        </label>
-        <label className="flex items-center gap-1.5">
-          <input
-            type="radio"
-            name={`type-${q.id}`}
-            checked={q.type === "poll"}
-            onChange={() => setType("poll")}
-          />
-          Poll (no right answer)
-        </label>
-      </div>
-      <label className="block">
-        <span className="sr-only">Question</span>
-        <textarea
-          value={q.prompt}
-          maxLength={MAX_PROMPT}
-          rows={3}
-          placeholder="Question"
-          onChange={(e) => onChange({ ...q, prompt: e.target.value })}
-          // Grows to fit the question where browsers support it.
-          className="min-h-20 w-full rounded-md border border-neutral-300 px-3 py-2 [field-sizing:content]"
-        />
-      </label>
+      {typeRadios}
+      {prompt}
       <fieldset className="space-y-1.5">
         <legend className="mb-1 text-xs text-neutral-500">
           Answers{q.type === "choice" && " (tick the right one)"}
@@ -289,6 +337,132 @@ function QuestionFields({ q, onChange }: { q: Editable; onChange: (q: Editable) 
           </label>
         </div>
       )}
+    </div>
+  );
+}
+
+/** A debate's verdicts, best first, and what each is worth; the side names and length. */
+function DebateFields({ q, onChange }: { q: DebateQuestion; onChange: (q: Editable) => void }) {
+  const setLevel = (i: number, text: string) => onChange({ ...q, levels: q.levels.map((l, j) => (j === i ? text : l)) });
+  const moveLevel = (i: number, by: number) => {
+    const j = i + by;
+    if (j < 0 || j >= q.levels.length) return;
+    const levels = [...q.levels];
+    [levels[i], levels[j]] = [levels[j], levels[i]];
+    onChange({ ...q, levels });
+  };
+  const names = q.sides ?? { for: "For", against: "Against" };
+  const n = q.levels.length;
+
+  return (
+    <div className="space-y-3">
+      <fieldset className="space-y-1.5">
+        <legend className="mb-1 text-xs text-neutral-500">
+          Verdicts, best first. Jev picks one for each argument and you can change it. Players never see these
+          words: the better the verdict, the taller their duck's pedestal (the last one stays on the ground).
+        </legend>
+        {q.levels.map((label, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="w-5 text-right text-xs text-neutral-400">{i + 1}</span>
+            <input
+              value={label}
+              maxLength={MAX_LEVEL_LABEL}
+              aria-label={`Verdict ${i + 1}`}
+              onChange={(e) => setLevel(i, e.target.value)}
+              className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-1.5"
+            />
+            <span className="w-14 text-right text-sm tabular-nums text-neutral-500" title="Points for this verdict">
+              {levelPoints(i, n, q.points)} pts
+            </span>
+            <button
+              type="button"
+              aria-label={`Move verdict ${i + 1} up`}
+              disabled={i === 0}
+              onClick={() => moveLevel(i, -1)}
+              className="rounded px-1.5 py-1 hover:bg-neutral-100 disabled:opacity-30"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              aria-label={`Move verdict ${i + 1} down`}
+              disabled={i === n - 1}
+              onClick={() => moveLevel(i, 1)}
+              className="rounded px-1.5 py-1 hover:bg-neutral-100 disabled:opacity-30"
+            >
+              ↓
+            </button>
+            {n > MIN_DEBATE_LEVELS && (
+              <button
+                type="button"
+                aria-label={`Remove verdict ${i + 1}`}
+                onClick={() => onChange({ ...q, levels: q.levels.filter((_, j) => j !== i) })}
+                className="rounded px-2 py-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        ))}
+        <div className="ml-7 flex gap-4 text-sm">
+          {n < MAX_DEBATE_LEVELS && (
+            <button type="button" onClick={() => onChange({ ...q, levels: [...q.levels, ""] })} className="text-neutral-600 underline">
+              + Add a verdict
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onChange({ ...q, levels: [...DEFAULT_DEBATE_LEVELS] })}
+            className="text-neutral-600 underline"
+          >
+            Reset to the usual five
+          </button>
+        </div>
+      </fieldset>
+      <div className="flex flex-wrap gap-4 text-sm">
+        <label className="flex items-center gap-2">
+          Points for the best
+          <input
+            type="number"
+            min={0}
+            max={10000}
+            value={q.points}
+            onChange={(e) => onChange({ ...q, points: Math.max(0, Math.min(10000, Number(e.target.value) || 0)) })}
+            className="w-24 rounded-md border border-neutral-300 px-2 py-1"
+          />
+        </label>
+        <label className="flex items-center gap-2">
+          Left side
+          <input
+            value={names.for}
+            maxLength={MAX_SIDE_NAME}
+            onChange={(e) => onChange({ ...q, sides: { ...names, for: e.target.value } })}
+            className="w-28 rounded-md border border-neutral-300 px-2 py-1"
+          />
+        </label>
+        <label className="flex items-center gap-2">
+          Right side
+          <input
+            value={names.against}
+            maxLength={MAX_SIDE_NAME}
+            onChange={(e) => onChange({ ...q, sides: { ...names, against: e.target.value } })}
+            className="w-28 rounded-md border border-neutral-300 px-2 py-1"
+          />
+        </label>
+        <label className="flex items-center gap-2">
+          Max characters
+          <input
+            type="number"
+            min={50}
+            max={MAX_DEBATE_LENGTH}
+            value={q.maxLength ?? MAX_DEBATE_LENGTH}
+            onChange={(e) =>
+              onChange({ ...q, maxLength: Math.max(50, Math.min(MAX_DEBATE_LENGTH, Number(e.target.value) || MAX_DEBATE_LENGTH)) })
+            }
+            className="w-20 rounded-md border border-neutral-300 px-2 py-1"
+          />
+        </label>
+      </div>
     </div>
   );
 }

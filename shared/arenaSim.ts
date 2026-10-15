@@ -3,9 +3,18 @@
  * standing in. Shared by the Worker (authoritative multiplayer) and the
  * browser (local demo), so both play by exactly the same rules.
  */
-import { arenaLayout, lobbyLayout, spawnPoint, zoneAt, zoneTarget, type ArenaLayout } from "./arena";
+import {
+  arenaLayout,
+  lobbyLayout,
+  spawnPoint,
+  teamLobbyLayout,
+  zoneAt,
+  zoneTarget,
+  type ArenaLayout,
+} from "./arena";
 import {
   emote,
+  flyTo,
   holdWalker,
   isMoving,
   makeWalker,
@@ -56,12 +65,26 @@ export function createArenaSim(options: number, playerIds: string[], expected = 
   return simFor(arenaLayout(options, expected), playerIds, expected);
 }
 
-/** The lobby: everyone waddling about an open patch, no answers to stand on. */
-export function createLobbySim(playerIds: string[]): ArenaSim {
-  return simFor(lobbyLayout(), playerIds, Math.max(30, playerIds.length));
+/**
+ * The lobby: everyone waddling about an open patch, no answers to stand on.
+ * In team mode each team has a corner (zone i = team i), and `teamOf` says
+ * which corner a player's duck starts in (null: the middle).
+ */
+export function createLobbySim(
+  playerIds: string[],
+  teams = 0,
+  teamOf: (id: string) => number | null = () => null,
+): ArenaSim {
+  const layout = teams >= 2 ? teamLobbyLayout(teams) : lobbyLayout();
+  return simFor(layout, playerIds, Math.max(30, playerIds.length), teamOf);
 }
 
-function simFor(layout: ArenaLayout, playerIds: string[], expected: number): ArenaSim {
+function simFor(
+  layout: ArenaLayout,
+  playerIds: string[],
+  expected: number,
+  zoneOf: (id: string) => number | null = () => null,
+): ArenaSim {
   const sim: ArenaSim = {
     layout,
     walkers: new Map(),
@@ -73,21 +96,44 @@ function simFor(layout: ArenaLayout, playerIds: string[], expected: number): Are
     holds: new Map(),
     frozen: false,
   };
-  for (const id of playerIds) ensureDuck(sim, id);
+  for (const id of playerIds) ensureDuck(sim, id, zoneOf(id));
   return sim;
 }
 
-/** Add a duck for this player if they don't have one yet (e.g. joined late). */
-export function ensureDuck(sim: ArenaSim, id: string): Walker {
+/**
+ * Add a duck for this player if they don't have one yet (e.g. joined late):
+ * in the middle huddle, or somewhere in `zone` (a team corner they're in).
+ */
+export function ensureDuck(sim: ArenaSim, id: string, zone: number | null = null): Walker {
   let w = sim.walkers.get(id);
   if (!w) {
-    const spot = spawnPoint(sim.layout, sim.spawned % sim.expected, sim.expected);
-    sim.spawned++;
+    const inZone = zone !== null && zone >= 0 && zone < sim.layout.zones.length;
+    const spot = inZone
+      ? zoneTarget(sim.layout, zone, jitterFor(id, 1), jitterFor(id, 2))
+      : spawnPoint(sim.layout, sim.spawned % sim.expected, sim.expected);
+    if (!inZone) sim.spawned++;
     w = makeWalker(id, spot.x, spot.z);
     sim.walkers.set(id, w);
-    sim.zones.set(id, { zone: null, since: 0 });
+    sim.zones.set(id, { zone: inZone ? zone : null, since: 0 });
   }
   return w;
+}
+
+/**
+ * The host moved this duck (auto-balancing teams): it takes off and lands
+ * in `zone`, and stays there until its player steers it somewhere else.
+ */
+export function flyDuckTo(sim: ArenaSim, id: string, zone: number): boolean {
+  const w = sim.walkers.get(id);
+  if (!w || sim.frozen || zone < 0 || zone >= sim.layout.zones.length) return false;
+  const salt = Math.floor(sim.t * 7) + 13;
+  const spot = zoneTarget(sim.layout, zone, jitterFor(id, salt), jitterFor(id, salt + 99));
+  sim.holds.delete(id);
+  sim.goals.set(id, zone);
+  flyTo(w, spot.x, spot.z);
+  w.tx = spot.x;
+  w.tz = spot.z;
+  return true;
 }
 
 export function removeDuck(sim: ArenaSim, id: string) {

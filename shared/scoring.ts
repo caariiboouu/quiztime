@@ -1,4 +1,4 @@
-import type { PublicPlayer, Team, TeamStanding } from "./protocol";
+import type { PublicPlayer, Team, TeamScoring, TeamStanding } from "./protocol";
 
 /**
  * Speed bonus for a correct choice answer: the full `max` for an instant
@@ -66,12 +66,24 @@ export function numericAwards(
 }
 
 /**
- * Team standings use the average score per member so a team of 8 doesn't
- * automatically beat a team of 5. Empty teams score 0.
+ * Debate verdicts: the best of `n` levels (0) earns `max`, the worst (n-1)
+ * earns 0, and the ones between fall evenly.
+ */
+export function levelPoints(level: number, n: number, max: number): number {
+  if (n <= 1) return max;
+  const clamped = Math.min(n - 1, Math.max(0, level));
+  return Math.round((max * (n - 1 - clamped)) / (n - 1));
+}
+
+/**
+ * Team standings. By default a team scores its members' total; with
+ * "average" it's points per member, so a team of 8 doesn't automatically
+ * beat a team of 5. Empty teams score 0.
  */
 export function teamStandings(
   teams: Team[],
   players: PublicPlayer[],
+  mode: TeamScoring = "total",
 ): TeamStanding[] {
   return teams
     .map((team) => {
@@ -80,7 +92,8 @@ export function teamStandings(
       return {
         ...team,
         members: members.length,
-        score: members.length ? Math.round(total / members.length) : 0,
+        score:
+          mode === "total" ? total : members.length ? Math.round(total / members.length) : 0,
       };
     })
     .sort((a, b) => b.score - a.score);

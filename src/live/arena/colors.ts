@@ -1,6 +1,11 @@
 /** Zone colours, matching the answer pad's option colours (components.tsx). */
 export const ZONE_COLORS = ["#0284c7", "#f59e0b", "#059669", "#e11d48", "#7c3aed", "#0d9488"];
 
+/** Zone `i`'s colour: its own (a team's, say) if given, else the answer colours. */
+export function zoneColor(i: number, colors?: string[]): string {
+  return colors?.[i] ?? ZONE_COLORS[i % ZONE_COLORS.length];
+}
+
 const ARROWS: [number, string][] = [
   [0, "→"],
   [Math.PI / 2, "↑"],

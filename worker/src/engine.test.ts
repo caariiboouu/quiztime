@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { RoomSettings, Show } from "../../shared/protocol";
+import { DEFAULT_DEBATE_LEVELS, type RoomSettings, type Show } from "../../shared/protocol";
 import {
   RuleError,
   addPlayer,
   applyJudgeResult,
+  balanceTeams,
   createRoom,
   finishJudging,
   hostAction,
@@ -13,7 +14,9 @@ import {
   playerAction,
   playerView,
   scores,
+  seededRng,
   setArenaAnswers,
+  setLobbyTeams,
   tick,
   validateSettings,
   UNDO_LIMIT,
@@ -118,7 +121,7 @@ describe("validation", () => {
 });
 
 describe("joining", () => {
-  it("rejects duplicate names and requires a team in team mode", () => {
+  it("rejects duplicate names; in team mode, lobby joiners pick a team later and late joiners get one", () => {
     const { room, t0 } = setup();
     expect(() =>
       addPlayer(room, { name: " ann ", teamId: null, duckHolderId: null }, "p3", "t3", t0),
@@ -131,9 +134,12 @@ describe("joining", () => {
         { id: "blue", name: "Blue", color: "#0000ff" },
       ],
     };
-    expect(() =>
-      addPlayer(room, { name: "Cat", teamId: null, duckHolderId: null }, "p3", "t3", t0),
-    ).toThrow(/team/);
+    // In the lobby they walk into a team's corner, so no team yet.
+    expect(addPlayer(room, { name: "Cat", teamId: null, duckHolderId: null }, "p3", "t3", t0).teamId).toBeNull();
+    expect(addPlayer(room, { name: "Dot", teamId: "blue", duckHolderId: null }, "p4", "t4", t0).teamId).toBe("blue");
+    // Once the game's going, a newcomer joins the smallest team.
+    room.phase = "segment";
+    expect(addPlayer(room, { name: "Eve", teamId: null, duckHolderId: null }, "p5", "t5", t0).teamId).toBe("red");
   });
 });
 
@@ -773,5 +779,199 @@ describe("going back a step (pressed too early)", () => {
     const { room, t0 } = setup();
     for (let i = 0; i < 9; i++) host(room, { t: "advance" }, t0 + i);
     expect(room.undo).toHaveLength(UNDO_LIMIT);
+  });
+});
+
+describe("debate question", () => {
+  const DEBATE_SHOW: Show = {
+    title: "Debate",
+    segments: [
+      {
+        kind: "question",
+        question: {
+          type: "debate",
+          id: "d1",
+          prompt: "Ducks are better than geese",
+          levels: [...DEFAULT_DEBATE_LEVELS],
+          points: 100,
+          sides: { for: "Ducks", against: "Geese" },
+        },
+      },
+    ],
+  };
+  function open(judge = true) {
+    const t0 = 1_000_000;
+    const room = createRoom("ABCD", "hostkey", { show: DEBATE_SHOW, settings: SETTINGS }, t0);
+    addPlayer(room, { name: "Ann", teamId: null, duckHolderId: null }, "p1", "tok1", t0);
+    addPlayer(room, { name: "Bob", teamId: null, duckHolderId: null }, "p2", "tok2", t0);
+    hostAction(room, { t: "advance" }, { now: t0, seed: 1, judgeAvailable: judge });
+    return { room, t0 };
+  }
+  const verdict = (level: number) => ({
+    status: "ok" as const,
+    suggestedPoints: 0,
+    criteria: [],
+    flags: [],
+    level,
+  });
+
+  it("validates its verdicts", () => {
+    expect(validateShow(DEBATE_SHOW)).toBeNull();
+    const few = structuredClone(DEBATE_SHOW);
+    (few.segments[0] as { question: { levels: string[] } }).question.levels = ["Good", "Bad"];
+    expect(validateShow(few)).toMatch(/3–8 verdicts/);
+    const dup = structuredClone(DEBATE_SHOW);
+    (dup.segments[0] as { question: { levels: string[] } }).question.levels = ["Good", "good", "Bad"];
+    expect(validateShow(dup)).toMatch(/different/);
+  });
+
+  it("has no timer, shows sides (not arguments) to players, and trims long arguments", () => {
+    const { room, t0 } = open();
+    expect(room.run?.closesAt).toBeNull();
+    answer(room, "p1", "d1", { type: "debate", side: "for", text: "Ducks quack" }, t0);
+    answer(room, "p2", "d1", { type: "debate", side: "against", text: "x".repeat(900) }, t0);
+    expect(room.run?.stage).toBe("open");
+    const sub = room.run?.submissions.p2.value;
+    expect(sub?.type === "debate" && sub.text.length).toBe(500);
+
+    const pv = playerView(room, "p2", both, t0);
+    expect(pv.segment?.sides).toEqual({ p1: "for", p2: "against" });
+    // Nobody sees the others' arguments or the verdict labels before the reveal.
+    expect(JSON.stringify(pv)).not.toContain("Ducks quack");
+    expect(JSON.stringify(pv)).not.toContain("Very good argument");
+  });
+
+  it("rejects an answer without a side", () => {
+    const { room, t0 } = open();
+    expect(() => answer(room, "p1", "d1", { type: "debate", side: "maybe", text: "hm" }, t0)).toThrow(
+      /side/,
+    );
+  });
+
+  it("scores by verdict: Jev suggests, the host can change it, even after the reveal", () => {
+    const { room, t0 } = open();
+    answer(room, "p1", "d1", { type: "debate", side: "for", text: "Ducks are calmer" }, t0);
+    answer(room, "p2", "d1", { type: "debate", side: "against", text: "Geese guard farms" }, t0);
+    expect(host(room, { t: "advance" }, t0).startJudging).toBe(true);
+    applyJudgeResult(room, "d1", "p1", verdict(0));
+    applyJudgeResult(room, "d1", "p2", verdict(3));
+    finishJudging(room, "d1");
+    expect(room.run?.stage).toBe("review");
+
+    host(room, { t: "setLevel", playerId: "p2", level: 1 }, t0);
+    host(room, { t: "advance" }, t0);
+    expect(room.run?.stage).toBe("revealed");
+    expect(room.run?.reveal?.levels).toEqual({ p1: 0, p2: 1 });
+    expect(room.run?.reveal?.levelCount).toBe(5);
+    // The pedestals show it; the verdicts themselves aren't put into words.
+    expect(JSON.stringify(room.run?.reveal)).not.toContain("argument");
+    expect(scores(room).get("p1")).toBe(100);
+    expect(scores(room).get("p2")).toBe(75);
+
+    // Changing a verdict after the reveal re-scores it (no double counting).
+    host(room, { t: "setLevel", playerId: "p1", level: 4 }, t0);
+    expect(room.run?.reveal?.levels?.p1).toBe(4);
+    expect(scores(room).get("p1") ?? 0).toBe(0);
+    expect(() => host(room, { t: "setLevel", playerId: "p1", level: 5 }, t0)).toThrow(/verdict/);
+  });
+
+  it("puts a blank argument on the ground, and an unjudged one in the middle", () => {
+    const { room, t0 } = open(false);
+    answer(room, "p1", "d1", { type: "debate", side: "for", text: "  " }, t0);
+    answer(room, "p2", "d1", { type: "debate", side: "against", text: "Honk" }, t0);
+    hostAction(room, { t: "advance" }, { now: t0, seed: 1, judgeAvailable: false });
+    expect(room.run?.stage).toBe("review");
+    host(room, { t: "advance" }, t0);
+    expect(room.run?.reveal?.levels).toEqual({ p1: 4, p2: 2 });
+    expect(scores(room).get("p2")).toBe(50);
+  });
+});
+
+describe("team mode", () => {
+  const TEAMS: RoomSettings = {
+    ...SETTINGS,
+    teamMode: true,
+    teams: [
+      { id: "red", name: "Red", color: "#ff0000" },
+      { id: "blue", name: "Blue", color: "#0000ff" },
+    ],
+  };
+  function lobby(n: number) {
+    const t0 = 1_000_000;
+    const room = createRoom("ABCD", "hostkey", { show: SHOW, settings: TEAMS }, t0);
+    for (let i = 1; i <= n; i++) {
+      addPlayer(room, { name: `P${i}`, teamId: null, duckHolderId: null }, `p${i}`, `t${i}`, t0);
+    }
+    return { room, t0 };
+  }
+  const sizes = (room: RoomState) =>
+    ["red", "blue"].map((t) => Object.values(room.players).filter((p) => p.teamId === t).length);
+
+  it("puts a duck on whichever team's corner it stands in", () => {
+    const { room } = lobby(3);
+    expect(setLobbyTeams(room, new Map([["p1", 0], ["p2", 1], ["p3", null]]))).toBe(true);
+    expect([room.players.p1.teamId, room.players.p2.teamId, room.players.p3.teamId]).toEqual([
+      "red",
+      "blue",
+      null,
+    ]);
+    // Standing still changes nothing.
+    expect(setLobbyTeams(room, new Map([["p1", 0]]))).toBe(false);
+    // Walking back to the middle leaves the team.
+    setLobbyTeams(room, new Map([["p1", null]]));
+    expect(room.players.p1.teamId).toBeNull();
+  });
+
+  it("auto-balance moves random ducks until the teams are even, and seats anyone without a team", () => {
+    const { room } = lobby(7);
+    setLobbyTeams(room, new Map(["p1", "p2", "p3", "p4", "p5", "p6"].map((p) => [p, 0])));
+    const moves = balanceTeams(room, seededRng(3));
+    const [red, blue] = sizes(room);
+    expect(red + blue).toBe(7);
+    expect(Math.abs(red - blue)).toBeLessThanOrEqual(1);
+    // Every move is reported so the ducks can be flown across.
+    for (const m of moves) expect(room.players[m.playerId].teamId).toBe(m.teamId);
+    expect(moves.some((m) => m.playerId === "p7")).toBe(true);
+    // Already even: nothing moves.
+    expect(balanceTeams(room, seededRng(4))).toEqual([]);
+  });
+
+  it("only balances in the lobby, through the host's button", () => {
+    const { room, t0 } = lobby(2);
+    expect(host(room, { t: "balanceTeams" }, t0).teamMoves).toHaveLength(2);
+    host(room, { t: "advance" }, t0);
+    expect(() => host(room, { t: "balanceTeams" }, t0)).toThrow(/lobby/);
+  });
+
+  it("seats anyone still without a team when the game starts", () => {
+    const { room, t0 } = lobby(3);
+    setLobbyTeams(room, new Map([["p1", 0]]));
+    host(room, { t: "advance" }, t0);
+    expect(sizes(room).sort()).toEqual([1, 2]);
+  });
+
+  it("adds every member's points to the team by default, or averages them", () => {
+    const { room, t0 } = lobby(3);
+    setLobbyTeams(room, new Map([["p1", 0], ["p2", 0], ["p3", 1]]));
+    host(room, { t: "advance" }, t0);
+    const three = new Set(["p1", "p2", "p3"]);
+    const say = (pid: string, id: string) =>
+      playerAction(
+        room,
+        pid,
+        { t: "answer", segmentId: "q1", value: { type: "choice", optionId: id } },
+        { now: t0, connected: three, judgeAvailable: true, newId: pid },
+      );
+    say("p1", "b");
+    say("p2", "b");
+    say("p3", "b");
+    host(room, { t: "advance" }, t0); // reveal
+    const view = hostView(room, three, t0, true);
+    const team = (id: string) => view.teams.find((t) => t.id === id)!.score;
+    expect(team("red")).toBe(2 * team("blue"));
+
+    room.settings.teamScoring = "average";
+    const avg = hostView(room, three, t0, true);
+    expect(avg.teams[0].score).toBe(avg.teams[1].score);
   });
 });

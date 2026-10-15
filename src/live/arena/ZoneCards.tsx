@@ -2,7 +2,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useMemo } from "react";
 import { Vector3 } from "three";
 import type { ArenaLayout } from "../../../shared/arena";
-import { ZONE_COLORS, zoneBadge } from "./colors";
+import { zoneBadge, zoneColor } from "./colors";
 
 /** Space kept between pinned cards and the edge of the view (px). */
 const EDGE = 8;
@@ -20,7 +20,9 @@ export function ZoneCards({
   refs,
   current,
   reveal,
+  colors,
 }: {
+  colors?: string[];
   options: { id: string; text: string }[];
   layout: ArenaLayout;
   refs: React.RefObject<(HTMLDivElement | null)[]>;
@@ -33,7 +35,7 @@ export function ZoneCards({
       {options.map((o, i) => {
         const zone = layout.zones[i];
         if (!zone) return null;
-        const color = ZONE_COLORS[i % ZONE_COLORS.length];
+        const color = zoneColor(i, colors);
         const correct = reveal?.correctIndex === i;
         const dim = reveal != null && reveal.correctIndex !== null && !correct;
         return (

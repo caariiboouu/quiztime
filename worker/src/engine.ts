@@ -3,6 +3,7 @@
  * the Durable Object (`room.ts`) owns sockets, storage, alarms and Jev calls,
  * and drives this module, which keeps the game rules unit-testable.
  */
+import type { WrittenQuestion } from "../../shared/protocol";
 import {
   LIGHTNING_INTRO_SEC,
   LIGHTNING_REVEAL_SEC,
@@ -10,7 +11,14 @@ import {
   MINIGAME_COUNTDOWN_SEC,
   MAX_QNA_LENGTH,
   MAX_WRITTEN_LENGTH,
+  MAX_DEBATE_LENGTH,
+  MAX_DEBATE_LEVELS,
+  MIN_DEBATE_LEVELS,
+  MAX_TEAMS,
+  MIN_TEAMS,
   type AnswerValue,
+  type DebateQuestion,
+  type DebateSide,
   type ChoiceQuestion,
   type CreateRoomRequest,
   type HostMessage,
@@ -43,6 +51,7 @@ import {
 import { cleanOutfit, type DuckOutfit } from "../../shared/outfit";
 import { ranksFromScores } from "../../shared/duckStandings";
 import {
+  levelPoints,
   numericAwards,
   placementAwards,
   speedBonus,
@@ -97,6 +106,8 @@ export type SegmentRun = {
   judge: Record<string, JudgeResult>;
   /** Host-confirmed points for written answers. */
   finalPoints: Record<string, number>;
+  /** Debate: host-confirmed verdicts (index into the levels, 0 = best). */
+  levels?: Record<string, number>;
   reveal: SegmentReveal | null;
 };
 
@@ -153,6 +164,8 @@ export type Effects = {
   resumeArena?: { segmentId: string; pausedMs: number };
   /** Close the socket(s) for this player. */
   disconnect?: string;
+  /** Team mode: these players changed team (walk their lobby ducks over). */
+  teamMoves?: { playerId: string; teamId: string }[];
 };
 
 export class RuleError extends Error {}
@@ -214,6 +227,28 @@ function questionError(q: LiveQuestion, where: string): string | null {
         return `${where}: each rubric criterion must be 1–300 characters`;
       }
       if (!isNum(q.points, 0, 10000)) return `${where}: points must be 0–10000`;
+      return null;
+    case "debate":
+      if (
+        !Array.isArray(q.levels) ||
+        q.levels.length < MIN_DEBATE_LEVELS ||
+        q.levels.length > MAX_DEBATE_LEVELS
+      ) {
+        return `${where}: a debate needs ${MIN_DEBATE_LEVELS}–${MAX_DEBATE_LEVELS} verdicts`;
+      }
+      if (!q.levels.every((l) => isStr(l, 60))) {
+        return `${where}: each verdict must be 1–60 characters`;
+      }
+      if (new Set(q.levels.map((l) => l.trim().toLowerCase())).size !== q.levels.length) {
+        return `${where}: verdicts must all be different`;
+      }
+      if (!isNum(q.points, 0, 10000)) return `${where}: points must be 0–10000`;
+      if (q.sides !== undefined && (!isStr(q.sides?.for, 24) || !isStr(q.sides?.against, 24))) {
+        return `${where}: side names must be 1–24 characters`;
+      }
+      if (q.maxLength !== undefined && !isNum(q.maxLength, 50, MAX_DEBATE_LENGTH)) {
+        return `${where}: maxLength must be 50–${MAX_DEBATE_LENGTH}`;
+      }
       return null;
     default:
       return `${where}: unknown question type`;
@@ -336,7 +371,12 @@ export function validateSettings(settings: unknown): string | null {
   if (!isNum(s.speedBonusMax, 0, 10000)) return "speedBonusMax must be 0–10000";
   if (s.arena !== undefined && typeof s.arena !== "boolean") return "arena must be true or false";
   if (!Array.isArray(s.teams) || s.teams.length > 8) return "Up to 8 teams";
-  if (s.teamMode && s.teams.length < 2) return "Team mode needs at least 2 teams";
+  if (s.teamMode && (s.teams.length < MIN_TEAMS || s.teams.length > MAX_TEAMS)) {
+    return `Team mode needs ${MIN_TEAMS}–${MAX_TEAMS} teams`;
+  }
+  if (s.teamScoring !== undefined && s.teamScoring !== "total" && s.teamScoring !== "average") {
+    return 'teamScoring must be "total" or "average"';
+  }
   const ids = new Set<string>();
   for (const t of s.teams) {
     if (!isStr(t?.id, 32) || !isStr(t?.name, 24)) return "Each team needs an id and a name (≤24)";
@@ -442,12 +482,12 @@ export function addPlayer(
   if (active.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
     throw new RuleError("Someone already has that name");
   }
+  // Team mode: in the lobby, players pick a team by walking their duck into
+  // it; anyone joining once the game's going goes to the smallest team.
   let teamId: string | null = null;
   if (state.settings.teamMode) {
-    if (!state.settings.teams.some((t) => t.id === req.teamId)) {
-      throw new RuleError("Pick a team");
-    }
-    teamId = req.teamId;
+    if (state.settings.teams.some((t) => t.id === req.teamId)) teamId = req.teamId;
+    else if (state.phase !== "lobby") teamId = smallestTeam(state, () => 0);
   }
   const duckHolderId =
     typeof req.duckHolderId === "string" && req.duckHolderId.length <= 64
@@ -467,6 +507,103 @@ export function addPlayer(
   };
   state.players[id] = player;
   return player;
+}
+
+// ---------------------------------------------------------------------------
+// Teams
+// ---------------------------------------------------------------------------
+
+function activePlayers(state: RoomState): PlayerRecord[] {
+  return Object.values(state.players).filter((p) => !p.kicked);
+}
+
+function teamSizes(state: RoomState): Map<string, number> {
+  const sizes = new Map(state.settings.teams.map((t) => [t.id, 0]));
+  for (const p of activePlayers(state)) {
+    if (p.teamId !== null && sizes.has(p.teamId)) sizes.set(p.teamId, sizes.get(p.teamId)! + 1);
+  }
+  return sizes;
+}
+
+/** The team with the fewest players; `rng` breaks ties. */
+function smallestTeam(state: RoomState, rng: () => number): string {
+  const sizes = [...teamSizes(state)];
+  const least = Math.min(...sizes.map(([, n]) => n));
+  const tied = sizes.filter(([, n]) => n === least);
+  return tied[Math.floor(rng() * tied.length) % tied.length][0];
+}
+
+/** Team mode lobby: put a player in a team (or none, standing in the middle). */
+export function setPlayerTeam(state: RoomState, playerId: string, teamId: string | null): boolean {
+  const p = state.players[playerId];
+  if (!state.settings.teamMode || state.phase !== "lobby" || !p || p.kicked) return false;
+  if (teamId !== null && !state.settings.teams.some((t) => t.id === teamId)) return false;
+  if (p.teamId === teamId) return false;
+  p.teamId = teamId;
+  return true;
+}
+
+/**
+ * Team mode lobby: each duck's team is whichever team's corner it stands in
+ * (zone i is team i; null is the middle, no team yet). Returns true if any
+ * player's team changed.
+ */
+export function setLobbyTeams(state: RoomState, zones: Map<string, number | null>): boolean {
+  let changed = false;
+  for (const [pid, zone] of zones) {
+    const team = zone === null ? null : state.settings.teams[zone]?.id ?? null;
+    if (setPlayerTeam(state, pid, team)) changed = true;
+  }
+  return changed;
+}
+
+/** Players still without a team go to the smallest ones (when the game starts). */
+function assignUnteamed(state: RoomState, rng: () => number): { playerId: string; teamId: string }[] {
+  if (!state.settings.teamMode) return [];
+  const moves: { playerId: string; teamId: string }[] = [];
+  const valid = new Set(state.settings.teams.map((t) => t.id));
+  for (const p of activePlayers(state)) {
+    if (p.teamId !== null && valid.has(p.teamId)) continue;
+    p.teamId = smallestTeam(state, rng);
+    moves.push({ playerId: p.id, teamId: p.teamId });
+  }
+  return moves;
+}
+
+/**
+ * Auto-balance: anyone without a team joins the smallest one, then random
+ * players move from the biggest team to the smallest until no two teams
+ * differ by more than one.
+ */
+export function balanceTeams(state: RoomState, rng: () => number): { playerId: string; teamId: string }[] {
+  if (!state.settings.teamMode) throw new RuleError("Team mode is off");
+  if (state.phase !== "lobby") throw new RuleError("Teams can only change in the lobby");
+  const moves = new Map(assignUnteamed(state, rng).map((m) => [m.playerId, m.teamId]));
+  for (;;) {
+    const sizes = [...teamSizes(state)].sort((a, b) => b[1] - a[1]);
+    const [big, most] = sizes[0];
+    const least = sizes[sizes.length - 1][1];
+    if (most - least <= 1) break;
+    const members = activePlayers(state).filter((p) => p.teamId === big);
+    const p = members[Math.floor(rng() * members.length) % members.length];
+    // Ties for smallest are random too, so the same team doesn't always win.
+    const smallest = sizes.filter(([, n]) => n === least);
+    p.teamId = smallest[Math.floor(rng() * smallest.length) % smallest.length][0];
+    moves.set(p.id, p.teamId);
+  }
+  return [...moves].map(([playerId, teamId]) => ({ playerId, teamId }));
+}
+
+/** A tiny seeded RNG, so a host action's randomness comes from its seed. */
+export function seededRng(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 export function playerByToken(state: RoomState, token: string): PlayerRecord | null {
@@ -678,9 +815,9 @@ export function closeSegment(state: RoomState, judgeAvailable: boolean, now: num
     }
     return {};
   }
-  if (seg.kind === "question" && seg.question.type === "written") {
+  if (seg.kind === "question" && isJudged(seg.question)) {
     const hasText = Object.values(run.submissions).some(
-      (s) => s.value.type === "written" && s.value.text.trim(),
+      (s) => (s.value.type === "written" || s.value.type === "debate") && s.value.text.trim(),
     );
     if (judgeAvailable && hasText) {
       run.stage = "judging";
@@ -689,6 +826,24 @@ export function closeSegment(state: RoomState, judgeAvailable: boolean, now: num
     run.stage = "review";
   }
   return {};
+}
+
+/** Question types Jev judges and the host reviews. */
+export function isJudged(q: LiveQuestion): q is WrittenQuestion | DebateQuestion {
+  return q.type === "written" || q.type === "debate";
+}
+
+/**
+ * Debate: the verdict an argument ends up with. The host's word, else Jev's;
+ * blank arguments get the lowest. With text but no verdict at all (Jev was
+ * down and the host didn't pick), it sits in the middle.
+ */
+export function debateLevel(run: SegmentRun, q: DebateQuestion, playerId: string): number {
+  const worst = q.levels.length - 1;
+  const sub = run.submissions[playerId]?.value;
+  if (sub?.type !== "debate" || !sub.text.trim()) return worst;
+  const level = run.levels?.[playerId] ?? run.judge[playerId]?.level;
+  return level ?? Math.floor(worst / 2);
 }
 
 /**
@@ -809,6 +964,20 @@ export function revealSegment(state: RoomState) {
         }
         break;
       }
+      case "debate": {
+        reveal.levels = {};
+        reveal.levelCount = q.levels.length;
+        for (const [pid, s] of subs) {
+          if (s.value.type !== "debate") continue;
+          const level = debateLevel(run, q, pid);
+          const pts = levelPoints(level, q.levels.length, q.points);
+          reveal.levels[pid] = level;
+          state.events.push({ playerId: pid, segmentId: segId, kind: "judge", points: pts });
+          // No verdict beside the points: the pedestals say it without words.
+          award(pid, pts);
+        }
+        break;
+      }
       case "poll": {
         reveal.distribution = Object.fromEntries(q.options.map((o) => [o.id, 0]));
         for (const [, s] of subs) {
@@ -863,6 +1032,8 @@ export function hostAction(
       if (state.phase === "ended") return {};
       remember(state, ctx.now);
       if (state.phase === "lobby" || state.phase === "leaderboard") {
+        // Nobody plays without a team: stragglers join the smallest.
+        if (state.phase === "lobby") assignUnteamed(state, seededRng(ctx.seed));
         // From the leaderboard, resume where we were: reveal or move on.
         if (state.run && state.run.stage !== "revealed") {
           state.phase = "segment";
@@ -928,11 +1099,29 @@ export function hostAction(
       if (run.stage === "revealed") revealSegment(state);
       return {};
     }
+    case "setLevel": {
+      const run = state.run;
+      const seg = currentSegment(state);
+      if (!run || !seg || seg.kind !== "question" || seg.question.type !== "debate") {
+        throw new RuleError("Not on a debate");
+      }
+      if (run.stage !== "review" && run.stage !== "revealed") {
+        throw new RuleError("Wait for judging to finish");
+      }
+      if (!run.submissions[msg.playerId]) throw new RuleError("No argument from that player");
+      const level = Math.round(Number(msg.level));
+      if (!(level >= 0 && level < seg.question.levels.length)) throw new RuleError("Unknown verdict");
+      run.levels = { ...run.levels, [msg.playerId]: level };
+      if (run.stage === "revealed") revealSegment(state);
+      return {};
+    }
+    case "balanceTeams":
+      return { teamMoves: balanceTeams(state, seededRng(ctx.seed)) };
     case "rejudge": {
       const run = state.run;
       const seg = currentSegment(state);
       if (!ctx.judgeAvailable) throw new RuleError("Jev isn't configured");
-      if (run?.stage !== "review" || seg?.kind !== "question" || seg.question.type !== "written") {
+      if (run?.stage !== "review" || seg?.kind !== "question" || !isJudged(seg.question)) {
         throw new RuleError("Nothing to re-judge");
       }
       run.judge = {};
@@ -980,6 +1169,12 @@ function validAnswer(seg: Segment, value: AnswerValue): AnswerValue {
       const max = (q.type === "written" && q.maxLength) || MAX_WRITTEN_LENGTH;
       return { type: "written", text: value.text.slice(0, max) };
     }
+    case "debate": {
+      if (value.side !== "for" && value.side !== "against") throw new RuleError("Pick a side");
+      if (typeof value.text !== "string") throw new RuleError("Invalid argument");
+      const max = (q.type === "debate" && q.maxLength) || MAX_DEBATE_LENGTH;
+      return { type: "debate", side: value.side, text: value.text.slice(0, max) };
+    }
     default:
       throw new RuleError("Invalid answer");
   }
@@ -1014,7 +1209,7 @@ export function playerAction(
 
       // Everyone's in: no need to wait out the clock. Written answers stay
       // open so people can keep editing until the host closes them.
-      const isWritten = seg.kind === "question" && seg.question.type === "written";
+      const isWritten = seg.kind === "question" && isJudged(seg.question);
       if (!isWritten && !isArena(seg)) {
         const eligible = eligiblePlayers(state, ctx.connected);
         if (eligible.length > 0 && eligible.every((id) => run.submissions[id])) {
@@ -1115,7 +1310,22 @@ export function publicQuestion(q: LiveQuestion): PublicQuestion {
     }
     case "poll":
       return q;
+    case "debate": {
+      const { levels, ...rest } = q;
+      return { ...rest, levelCount: levels.length };
+    }
   }
+}
+
+/** Debate: which side everyone's duck is on (not what they wrote). */
+function debateSides(state: RoomState): Record<string, DebateSide> | undefined {
+  const seg = currentSegment(state);
+  if (!state.run || seg?.kind !== "question" || seg.question.type !== "debate") return undefined;
+  const out: Record<string, DebateSide> = {};
+  for (const [pid, sub] of Object.entries(state.run.submissions)) {
+    if (sub.value.type === "debate" && !state.players[pid]?.kicked) out[pid] = sub.value.side;
+  }
+  return out;
 }
 
 function publicSegment(state: RoomState, connected: Set<string>): PublicSegment | null {
@@ -1136,10 +1346,15 @@ function publicSegment(state: RoomState, connected: Set<string>): PublicSegment 
     speedScored: isSpeedScored(seg, state.settings),
     round: seg.kind === "question" ? seg.round : undefined,
     arena: run.arena ?? undefined,
-    answeredCount: Object.keys(run.submissions).filter(
-      (id) => state.players[id] && !state.players[id].kicked,
+    answeredCount: Object.entries(run.submissions).filter(
+      ([id, sub]) =>
+        state.players[id] &&
+        !state.players[id].kicked &&
+        // A debate side with nothing argued yet doesn't count as an answer.
+        (sub.value.type !== "debate" || sub.value.text.trim() !== ""),
     ).length,
     eligibleCount: eligible.length,
+    sides: debateSides(state),
     question: seg.kind === "question" ? publicQuestion(seg.question) : undefined,
     minigame:
       seg.kind === "minigame"
@@ -1194,7 +1409,7 @@ export function playerView(
     settings: state.settings,
     me: { ...me, duckHolderId: p?.duckHolderId ?? null },
     players,
-    teams: teamStandings(state.settings.teams, players),
+    teams: teamStandings(state.settings.teams, players, state.settings.teamScoring),
     segment: publicSegment(state, connected),
     myAnswer: state.run?.submissions[playerId]?.value ?? null,
     myAward: revealed
@@ -1256,6 +1471,7 @@ export function hostView(
           elapsedMs: sub.at - run.answersOpenAt,
           judge: run.judge[pid],
           finalPoints: run.finalPoints[pid],
+          finalLevel: run.levels?.[pid],
         }))
         .sort((a, b) => a.elapsedMs - b.elapsedMs)
     : [];
@@ -1277,7 +1493,7 @@ export function hostView(
     phase: state.phase,
     settings: state.settings,
     players,
-    teams: teamStandings(state.settings.teams, players),
+    teams: teamStandings(state.settings.teams, players, state.settings.teamScoring),
     segment: publicSegment(state, connected),
     fullSegment: currentSegment(state),
     submissions,

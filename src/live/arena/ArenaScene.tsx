@@ -7,7 +7,7 @@ import { NameTag } from "../flock/NameTag";
 import { DuckModel } from "../mascot/DuckModel";
 import type { DuckLook } from "../mascot/variants";
 import { FitCamera } from "../minigames/three/Stage3D";
-import { ZONE_COLORS } from "./colors";
+import { zoneColor } from "./colors";
 import type { ArenaSource } from "./source";
 import { ZoneCardTracker, ZoneCards } from "./ZoneCards";
 import { placeDuck } from "./placeDuck";
@@ -30,6 +30,8 @@ type ArenaSceneProps = {
   current?: number | null;
   /** Px at the bottom covered by on-screen controls: answer cards keep clear. */
   safeBottom?: number;
+  /** Zone colours, if not the answer colours (the lobby's team corners). */
+  colors?: string[];
   className?: string;
   description: string;
 };
@@ -57,7 +59,7 @@ export default function ArenaScene({
         ) : (
           <FitCamera width={layout.radius * 2 + 1.2} depth={layout.radius * 2 + 3.2} elevation={62} />
         )}
-        <ArenaGround layout={layout} reveal={props.reveal ?? null} />
+        <ArenaGround layout={layout} reveal={props.reveal ?? null} colors={props.colors} />
         <ZoneCardTracker layout={layout} refs={cardRefs} safeBottom={safeBottom} />
         <ArenaDucks layout={layout} {...props} />
       </Canvas>
@@ -67,6 +69,7 @@ export default function ArenaScene({
         refs={cardRefs}
         current={props.current}
         reveal={props.reveal}
+        colors={props.colors}
       />
       <p className="sr-only">{description}</p>
     </div>
@@ -112,9 +115,11 @@ function tint(hex: string, toward: string, amount: number): string {
 function ArenaGround({
   layout,
   reveal,
+  colors,
 }: {
   layout: ArenaLayout;
   reveal: { correctIndex: number | null } | null;
+  colors?: string[];
 }) {
   const flat: [number, number, number] = [-Math.PI / 2, 0, 0];
   return (
@@ -129,7 +134,7 @@ function ArenaGround({
         <meshLambertMaterial color="#e9dfc8" />
       </mesh>
       {layout.zones.map((z) => {
-        const base = ZONE_COLORS[z.index % ZONE_COLORS.length];
+        const base = zoneColor(z.index, colors);
         const correct = reveal?.correctIndex === z.index;
         const wrong = reveal != null && reveal.correctIndex !== null && !correct;
         const color = correct ? tint(base, "#ffffff", 0.15) : wrong ? "#d6d3cd" : tint(base, "#ffffff", 0.55);
