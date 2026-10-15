@@ -406,9 +406,11 @@ export type PlayerView = {
   /**
    * The self-running practice room (shared/practice.ts): there's no host, and
    * the game moves on by itself at `nextAt` (null while it waits on a
-   * question's own clock, or for someone to turn up). Null in a normal room.
+   * question's own clock, or for someone to turn up). `judged`: false when
+   * Jev isn't on (no key, or the day's budget is spent), so arguments and
+   * written answers all score the middle. Null in a normal room.
    */
-  autopilot: { nextAt: number | null } | null;
+  autopilot: { nextAt: number | null; judged: boolean } | null;
 };
 
 export type PublicQna = {

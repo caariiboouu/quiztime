@@ -6,16 +6,13 @@ import { SoundToggle } from "../arena/ArenaControls";
 import { Banner } from "../components";
 import { PlayerGame } from "../PlayerApp";
 
-/** The seat, plus whether arguments get judged (false: Jev's off, everyone scores the middle). */
-type PracticeSeat = PlayerCreds & { judged?: boolean };
-
 /**
  * #/live/test: the debate & teams practice room (shared/practice.ts). A real
  * game that runs itself on a timer, in team mode, with one of every kind of
  * question and three debates. Anyone with the link joins with just a name.
  */
 export function PracticeRoomPage({ onExit }: { onExit: () => void }) {
-  const [seat, setSeat] = useState<PracticeSeat | null>(() => loadPlayerCreds(PRACTICE_CODE));
+  const [seat, setSeat] = useState<PlayerCreds | null>(() => loadPlayerCreds(PRACTICE_CODE));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,12 +21,7 @@ export function PracticeRoomPage({ onExit }: { onExit: () => void }) {
     setError(null);
     try {
       const res = await joinPractice(name);
-      const next: PracticeSeat = {
-        code: res.code,
-        playerId: res.playerId,
-        token: res.token,
-        judged: res.judged,
-      };
+      const next: PlayerCreds = { code: res.code, playerId: res.playerId, token: res.token };
       savePlayerCreds(PRACTICE_CODE, next);
       setSeat(next);
     } catch (err) {
@@ -53,14 +45,6 @@ export function PracticeRoomPage({ onExit }: { onExit: () => void }) {
           </button>
         </div>
       </div>
-      {seat && seat.judged === false && (
-        <div className="mx-auto max-w-3xl px-4 pb-2 sm:px-6">
-          <Banner kind="info">
-            Jev isn't judging right now, so every argument and written answer scores the middle. Everything else
-            works as normal.
-          </Banner>
-        </div>
-      )}
     </header>
   );
 

@@ -21,6 +21,7 @@ import {
   finishJudging,
   nextDeadline,
   playerAction,
+  playerView,
   scores,
   tick,
   validateSettings,
@@ -216,6 +217,17 @@ describe("practice room odds and ends", () => {
     expect(practiceJevLeft(room, tomorrow)).toBe(PRACTICE_JEV_CALLS_PER_DAY);
     spendPracticeJev(room, tomorrow, 3);
     expect(practiceJevLeft(room, tomorrow)).toBe(PRACTICE_JEV_CALLS_PER_DAY - 3);
+  });
+
+  it("tells players when it moves on, and whether Jev is judging", () => {
+    const room = practice();
+    const here = new Set(["p1"]);
+    run(room, t0, here);
+    expect(playerView(room, "p1", here, t0, false).autopilot).toEqual({ nextAt: t0 + T.lobby * 1000, judged: false });
+    expect(playerView(room, "p1", here, t0, true).autopilot?.judged).toBe(true);
+    // A normal room has no autopilot.
+    delete room.autopilot;
+    expect(playerView(room, "p1", here, t0).autopilot).toBeNull();
   });
 
   it("tidies names, numbers a taken one, and picks one for a blank", () => {

@@ -347,6 +347,14 @@ export function PlayerGame({
           </Banner>
         </div>
       )}
+      {view.autopilot && !view.autopilot.judged && (
+        <div className="mb-4">
+          <Banner kind="info">
+            Jev isn't judging right now, so every argument and written answer scores the middle. Everything else
+            works as normal.
+          </Banner>
+        </div>
+      )}
 
       <div className="flex-1">
         <PlayerStage view={view} send={send} offsetMs={offsetMs} feed={arenaRef} />

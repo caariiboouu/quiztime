@@ -233,7 +233,7 @@ export class Room extends DurableObject<Env> {
       await this.save();
       this.broadcast();
       logEvent("practice_room_join", { players: Object.keys(room.players).length });
-      return { code: room.code, playerId: player.id, token: player.token, judged: this.judgeAvailable };
+      return { code: room.code, playerId: player.id, token: player.token };
     } catch (err) {
       if (err instanceof RuleError) return { error: err.message };
       throw err;
@@ -717,7 +717,7 @@ export class Room extends DurableObject<Env> {
         } satisfies ServerMessage);
         ws.send(hostPayload);
       } else {
-        this.send(ws, { t: "state", view: playerView(room, a.playerId, connected, now) });
+        this.send(ws, { t: "state", view: playerView(room, a.playerId, connected, now, this.judgeAvailable) });
       }
     }
   }

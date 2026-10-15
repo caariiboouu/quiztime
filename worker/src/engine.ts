@@ -1399,6 +1399,8 @@ export function playerView(
   playerId: string,
   connected: Set<string>,
   now: number,
+  /** Whether Jev can judge right now (the practice room tells its players). */
+  judged = true,
 ): PlayerView {
   const players = publicPlayers(state, connected);
   const p = state.players[playerId];
@@ -1434,7 +1436,7 @@ export function playerView(
           .reduce((s, e) => s + e.points, 0)
       : null,
     qna: publicQna(state, playerId),
-    autopilot: state.autopilot ? { nextAt: state.autopilot.at } : null,
+    autopilot: state.autopilot ? { nextAt: state.autopilot.at, judged } : null,
   };
 }
 

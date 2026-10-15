@@ -56,8 +56,6 @@ export type PracticeJoinResponse = {
   code: string;
   playerId: string;
   token: string;
-  /** False when the server has no Jev key (or the day's Jev budget is spent). */
-  judged: boolean;
 };
 
 export const PRACTICE_SETTINGS: RoomSettings = {
