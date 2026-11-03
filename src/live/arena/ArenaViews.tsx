@@ -15,9 +15,14 @@ import type { ArenaMove } from "../../../shared/arenaSim";
 
 type Options = { id: string; text: string }[];
 
-/** Members for the arena, rebuilt only when someone joins or leaves. */
+/**
+ * Members for the arena, rebuilt only when someone joins or leaves. House
+ * ducks never walk it, so they aren't counted as being in it.
+ */
 function useMembers(players: PublicPlayer[]): ArenaMember[] {
-  const key = JSON.stringify(players.map((p) => [p.id, p.lookIndex, p.name, p.duckHolderId, p.outfit]));
+  const key = JSON.stringify(
+    players.filter((p) => !p.house).map((p) => [p.id, p.lookIndex, p.name, p.duckHolderId, p.outfit]),
+  );
   const leader = useDuckLeader();
   return useMemo(() => {
     type Row = [string, number, string, string | null, DuckOutfit | null];

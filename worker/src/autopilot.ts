@@ -3,22 +3,28 @@
  * room (shared/practice.ts). Each step waits a set time and then presses what
  * a host would (balance the teams, next, show the scores), and a finished
  * game starts over with whoever's still there. The game itself is the normal
- * engine; this only decides when to move it on.
+ * engine; this only decides when to move it on, and seats the house ducks
+ * who argue the debates.
  */
 import {
   PRACTICE_CODE,
+  PRACTICE_HOUSE,
+  PRACTICE_HOUSE_ARGUMENTS,
   PRACTICE_JEV_CALLS_PER_DAY,
   PRACTICE_MAX_NAME,
   PRACTICE_SETTINGS,
   PRACTICE_SHOW,
   PRACTICE_TIMING as T,
 } from "../../shared/practice";
+import type { FactMark } from "../../shared/protocol";
 import {
+  addPlayer,
   createRoom,
   currentSegment,
   hostAction,
   isJudged,
   presentation,
+  RuleError,
   type Effects,
   type RoomState,
 } from "./engine";
@@ -87,7 +93,10 @@ export function autopilotStep(state: RoomState, ctx: AutopilotContext): Effects 
   }
   if (ap.at === null) ap.at = due(state, ctx);
   else if (state.phase === "lobby" && here(state, ctx.connected).length === 0) ap.at = null;
-  if (state.phase === "segment" && state.run?.stage === "open") closeEarlyIfAllIn(state, ctx);
+  if (state.phase === "segment" && state.run?.stage === "open") {
+    houseArgue(state, ctx.now);
+    closeEarlyIfAllIn(state, ctx);
+  }
   if (ap.at === null || ctx.now < ap.at) return null;
   ap.at = null;
   return act(state, ctx);
@@ -164,8 +173,11 @@ function act(state: RoomState, ctx: AutopilotContext): Effects | null {
       if (!ap.balanced) {
         // Whoever's gone since doesn't count toward the teams.
         dropAbsent(state, ctx.connected);
+        freshQuestions(state, ctx.now);
         ap.balanced = true;
-        return press("balanceTeams");
+        const effects = press("balanceTeams");
+        seatHouse(state, ctx.now);
+        return effects;
       }
       ap.balanced = false;
       return press("advance");
@@ -178,6 +190,51 @@ function act(state: RoomState, ctx: AutopilotContext): Effects | null {
       restartGame(state, ctx);
       return {};
   }
+}
+
+/**
+ * A new game plays the latest questions, even in a room set up before they
+ * changed (it can sit in the lobby for a day).
+ */
+function freshQuestions(state: RoomState, now: number) {
+  const fresh = createRoom(state.code, state.hostKey, { show: PRACTICE_SHOW, settings: PRACTICE_SETTINGS }, now);
+  state.title = fresh.title;
+  state.settings = fresh.settings;
+  state.segments = fresh.segments;
+}
+
+const houseId = (i: number) => `house-${i}`;
+
+/** The house ducks take their seats, once the real players' teams are even. */
+function seatHouse(state: RoomState, now: number) {
+  PRACTICE_HOUSE.forEach((duck, i) => {
+    if (state.players[houseId(i)]) return;
+    try {
+      const join = { name: duck.name, teamId: duck.teamId, duckHolderId: null, lookIndex: duck.lookIndex };
+      addPlayer(state, join, houseId(i), crypto.randomUUID(), now).house = true;
+    } catch (err) {
+      // Someone's taken that duck's name: it sits this game out.
+      if (!(err instanceof RuleError)) throw err;
+    }
+  });
+}
+
+/** A debate's open: the house ducks have their say, verdicts and facts and all. */
+function houseArgue(state: RoomState, now: number) {
+  const run = state.run!;
+  const seg = currentSegment(state);
+  if (seg?.kind !== "question" || seg.question.type !== "debate") return;
+  const q = seg.question;
+  (PRACTICE_HOUSE_ARGUMENTS[q.id] ?? []).forEach((a, i) => {
+    const id = houseId(a.duck);
+    if (!state.players[id] || run.submissions[id]) return;
+    // A millisecond apart, so they're read out in this order.
+    run.submissions[id] = { value: { type: "debate", side: a.side, text: a.text }, at: Math.max(now, run.answersOpenAt) + i };
+    (run.levels ??= {})[id] = a.level;
+    const mark = (f: number): FactMark =>
+      a.bluffs?.includes(f) ? "bluff" : a.uncovers?.includes(f) ? "uncovered" : "none";
+    (run.factMarks ??= {})[id] = Object.fromEntries((q.facts ?? []).map((_, f) => [f, mark(f)]));
+  });
 }
 
 function dropAbsent(state: RoomState, connected: Set<string>) {

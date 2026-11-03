@@ -9,7 +9,8 @@ import { PlayerGame } from "../PlayerApp";
 /**
  * #/live/test: the debate & teams practice room (shared/practice.ts). A real
  * game that runs itself on a timer, in team mode, with one of every kind of
- * question and three debates. Anyone with the link joins with just a name.
+ * question and three debates, which the house ducks argue too. Anyone with
+ * the link joins with just a name.
  */
 export function PracticeRoomPage({ onExit }: { onExit: () => void }) {
   const [seat, setSeat] = useState<PlayerCreds | null>(() => loadPlayerCreds(PRACTICE_CODE));
@@ -78,8 +79,9 @@ export function PracticeRoomPage({ onExit }: { onExit: () => void }) {
             before it starts.
           </p>
           <p className="text-sm text-neutral-500">
-            Three debates, a poll, a written answer, a number guess and two quick ones. When it ends, a new game
-            starts.
+            Three debates, a poll, a written answer, a number guess and two quick ones. Four house ducks argue
+            every debate too, so there's a back-and-forth and facts to turn over even if you're on your own.
+            When it ends, a new game starts.
           </p>
         </div>
         {error && <Banner kind="error">{error}</Banner>}

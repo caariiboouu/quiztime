@@ -40,6 +40,7 @@ import { MINIGAMES } from "./minigames";
 import { MinigamePlayer } from "./minigames/MinigamePlayer";
 import { hasWebGL } from "./minigames/three/fallbackContext";
 import { useGraphicsPref } from "./minigames/useGraphicsPref";
+import { useDraft } from "./useDraft";
 import { useRoom, useServerNow, type ArenaFeed, type RoomStatus } from "./useRoom";
 import { PlayerArena, PlayerLobby } from "./arena/ArenaViews";
 import { DEFAULT_FACT_POINTS } from "../../shared/debateFacts";
@@ -693,6 +694,7 @@ function QuestionStage({
       {q.type === "written" && (
         <WrittenInput
           segmentId={seg.id}
+          openedAt={seg.openedAt}
           maxLength={q.maxLength ?? MAX_WRITTEN_LENGTH}
           disabled={!open}
           submitted={view.myAnswer?.type === "written" ? view.myAnswer.text : null}
@@ -715,6 +717,7 @@ function QuestionStage({
           {!revealed && (
             <DebateInput
               segmentId={seg.id}
+              openedAt={seg.openedAt}
               names={debateNames(q.sides)}
               maxLength={q.maxLength || MAX_DEBATE_LENGTH}
               disabled={!open}
@@ -842,32 +845,20 @@ function NumericInput({
 
 function WrittenInput({
   segmentId,
+  openedAt,
   maxLength,
   disabled,
   submitted,
   onSubmit,
 }: {
   segmentId: string;
+  openedAt: number;
   maxLength: number;
   disabled: boolean;
   submitted: string | null;
   onSubmit: (text: string) => void;
 }) {
-  const draftKey = `quiztime.live.draft.${segmentId}`;
-  const [text, setText] = useState(() => {
-    try {
-      return localStorage.getItem(draftKey) ?? submitted ?? "";
-    } catch {
-      return submitted ?? "";
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem(draftKey, text);
-    } catch {
-      // Drafts are a convenience only.
-    }
-  }, [draftKey, text]);
+  const [text, setText] = useDraft(segmentId, openedAt, submitted ?? "");
 
   const saved = submitted !== null && submitted === text;
   const submit = () => !disabled && text.trim() && onSubmit(text);

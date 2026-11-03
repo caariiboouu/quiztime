@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { DebateSide } from "../../../shared/protocol";
 import { useControls } from "../controls";
 import { Kbd } from "../Kbd";
+import { useDraft } from "../useDraft";
 
 /**
  * Argue for or against: pick a side (your duck hops over to it straight away),
@@ -11,6 +12,7 @@ import { Kbd } from "../Kbd";
  */
 export function DebateInput({
   segmentId,
+  openedAt,
   names,
   maxLength,
   disabled,
@@ -19,6 +21,7 @@ export function DebateInput({
   board,
 }: {
   segmentId: string;
+  openedAt: number;
   names: { for: string; against: string };
   maxLength: number;
   disabled: boolean;
@@ -27,23 +30,9 @@ export function DebateInput({
   /** What's at stake beyond the verdict: the hidden facts each side has, and the win bonus. */
   board?: { counts?: Record<DebateSide, number>; factPoints: number; winBonus: number };
 }) {
-  const draftKey = `quiztime.live.draft.${segmentId}`;
   const [side, setSide] = useState<DebateSide | null>(submitted?.side ?? null);
-  const [text, setText] = useState(() => {
-    try {
-      return localStorage.getItem(draftKey) ?? submitted?.text ?? "";
-    } catch {
-      return submitted?.text ?? "";
-    }
-  });
+  const [text, setText] = useDraft(segmentId, openedAt, submitted?.text ?? "");
   const box = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    try {
-      localStorage.setItem(draftKey, text);
-    } catch {
-      // Drafts are a convenience only.
-    }
-  }, [draftKey, text]);
 
   // Keep the server up to date as they type (a pause is enough).
   const sendRef = useRef(onSend);

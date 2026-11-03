@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { factFits } from "../../shared/debateFacts";
 import {
   PRACTICE_CODE,
+  PRACTICE_HOUSE,
+  PRACTICE_HOUSE_ARGUMENTS,
   PRACTICE_JEV_CALLS_PER_DAY,
   PRACTICE_SETTINGS,
   PRACTICE_SHOW,
@@ -103,7 +106,7 @@ describe("autopilot", () => {
     const effects = run(room, t0 + T.lobby * 1000, here);
     expect(effects[0].teamMoves?.length).toBe(1);
     const sizes = ["mallards", "canvasbacks"].map(
-      (t) => Object.values(room.players).filter((p) => p.teamId === t).length,
+      (t) => Object.values(room.players).filter((p) => p.teamId === t && !p.house).length,
     );
     expect(sizes.sort()).toEqual([1, 2]);
     expect(room.phase).toBe("lobby");
@@ -201,6 +204,73 @@ describe("autopilot", () => {
     run(room2, t + 1000, here, true);
     run(room2, t + 1000 + T.review * 1000, here, true);
     expect(room2.run?.stage).toBe("revealed");
+  });
+});
+
+describe("house ducks", () => {
+  const debates = expandShow(PRACTICE_SHOW).flatMap((s) =>
+    s.kind === "question" && s.question.type === "debate" ? [s.question] : [],
+  );
+
+  it("argue the show's debates, crediting facts that exist and fit their side", () => {
+    const teams = new Set(PRACTICE_SETTINGS.teams.map((t) => t.id));
+    for (const duck of PRACTICE_HOUSE) expect(teams.has(duck.teamId)).toBe(true);
+    for (const [id, args] of Object.entries(PRACTICE_HOUSE_ARGUMENTS)) {
+      const q = debates.find((d) => d.id === id);
+      expect(q, id).toBeDefined();
+      const facts = q!.facts ?? [];
+      expect(new Set(args.map((a) => a.duck)).size).toBe(args.length);
+      for (const a of args) {
+        expect(PRACTICE_HOUSE[a.duck]).toBeDefined();
+        expect(a.level).toBeGreaterThanOrEqual(0);
+        expect(a.level).toBeLessThan(q!.levels.length);
+        expect(a.text.length).toBeLessThanOrEqual(500);
+        for (const f of a.uncovers ?? []) expect(facts[f] && factFits(facts[f], a.side), `${id} fact ${f}`).toBe(true);
+        for (const f of a.bluffs ?? []) expect(facts[f], `${id} fact ${f}`).toBeDefined();
+      }
+    }
+  });
+
+  it("sit in with one person, argue without Jev, and turn the facts over", () => {
+    const room = createPracticeRoom("hostkey", t0);
+    addPlayer(room, { name: "Ann", teamId: null, duckHolderId: null, lookIndex: 0 }, "p1", "tok1", t0);
+    const here = new Set(["p1"]);
+    let now = until(room, t0, here, () => room.phase === "segment", true);
+    const house = Object.values(room.players).filter((p) => p.house);
+    expect(house.map((p) => p.name).sort()).toEqual(PRACTICE_HOUSE.map((d) => d.name).sort());
+    expect(house.filter((p) => p.teamId === "mallards")).toHaveLength(2);
+    const shown = playerView(room, "p1", here, now).players;
+    expect(shown.every((p) => p.connected)).toBe(true);
+    expect(shown.filter((p) => p.house)).toHaveLength(4);
+
+    now = until(room, now, here, () => {
+      const seg = currentSegment(room);
+      return seg?.kind === "question" && seg.question.id === "d-hotdog" && room.run?.stage === "open";
+    }, true);
+    expect(Object.keys(room.run!.submissions).sort()).toEqual(["house-0", "house-1", "house-2", "house-3"]);
+    // Only the house argued: nothing for Jev to judge, even with Jev on.
+    now = until(room, now, here, () => room.run?.stage !== "open", true);
+    expect(room.run?.stage).toBe("review");
+    until(room, now, here, () => room.run?.stage === "revealed", true);
+    // Sandwich found 1 of its 2 facts, Not a sandwich its only one.
+    expect(room.run!.reveal!.debate).toMatchObject({ winner: "against", argued: { for: 2, against: 2 } });
+    expect(room.run!.reveal!.facts?.map((f) => f.uncoveredBy)).toEqual([["house-1"], [], ["house-0"]]);
+    // Pip argued it best, found a fact and won: the most points.
+    expect(scores(room).get("house-0")).toBe(Math.max(...scores(room).values()));
+  });
+
+  it("are gone when the game ends, and a new game plays the latest questions", () => {
+    const room = createPracticeRoom("hostkey", t0);
+    // A room set up before the questions changed.
+    room.segments = room.segments.slice(0, 2);
+    room.title = "Old practice";
+    addPlayer(room, { name: "Ann", teamId: null, duckHolderId: null, lookIndex: 0 }, "p1", "tok1", t0);
+    const here = new Set(["p1"]);
+    const now = until(room, t0, here, () => room.phase === "segment");
+    expect(room.title).toBe(PRACTICE_SHOW.title);
+    expect(room.segments).toHaveLength(expandShow(PRACTICE_SHOW).length);
+    until(room, now, here, () => room.phase === "lobby");
+    expect(Object.keys(room.players)).toEqual(["p1"]);
   });
 });
 

@@ -408,8 +408,10 @@ export class Room extends DurableObject<Env> {
   private async runAutopilot() {
     const room = this.room;
     if (!room?.autopilot) return;
-    // Players see when it moves on next, and an untimed question's new clock.
-    const shown = () => `${room.autopilot?.at}|${room.run?.closesAt}`;
+    // Players see when it moves on next, an untimed question's new clock, and
+    // the house ducks' arguments.
+    const shown = () =>
+      `${room.autopilot?.at}|${room.run?.closesAt}|${Object.keys(room.run?.submissions ?? {}).length}`;
     let sent = shown();
     // A few at most: one step can make the next due at once.
     for (let i = 0; i < 4; i++) {
@@ -467,13 +469,16 @@ export class Room extends DurableObject<Env> {
     if (!room?.run || seg?.kind !== "question" || !isJudged(seg.question)) return;
     const segId = segmentId(seg);
     const question = seg.question;
-    const items = Object.entries(room.run.submissions).flatMap(([playerId, s]) =>
-      s.value.type === "written"
-        ? [{ playerId, text: s.value.text }]
-        : s.value.type === "debate"
-          ? [{ playerId, text: s.value.text, side: s.value.side }]
-          : [],
-    );
+    const items = Object.entries(room.run.submissions)
+      // House ducks come with their verdicts (see autopilot.ts).
+      .filter(([playerId]) => !room.players[playerId]?.house)
+      .flatMap(([playerId, s]) =>
+        s.value.type === "written"
+          ? [{ playerId, text: s.value.text }]
+          : s.value.type === "debate"
+            ? [{ playerId, text: s.value.text, side: s.value.side }]
+            : [],
+      );
     // Practice room: counted up front, so calls that fail still use up the day's budget.
     if (room.autopilot) spendPracticeJev(room, Date.now(), items.length);
     const cfg: JevConfig = {

@@ -347,6 +347,8 @@ export type PublicPlayer = {
   duckHolderId: string | null;
   /** The hat and neckpiece they picked (saved on their account). */
   outfit: DuckOutfit | null;
+  /** One of the practice room's house ducks, who argue debates but never walk the arena. */
+  house?: boolean;
 };
 
 export type TeamStanding = Team & {

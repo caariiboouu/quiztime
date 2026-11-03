@@ -103,6 +103,11 @@ export type PlayerRecord = {
   token: string;
   joinedAt: number;
   kicked: boolean;
+  /**
+   * One of the practice room's own ducks (see PRACTICE_HOUSE): always here,
+   * never judged by Jev, and gone when the game ends.
+   */
+  house?: boolean;
 };
 
 export type SegmentRun = {
@@ -834,7 +839,7 @@ function openAnswers(state: RoomState, now: number) {
   run.stage = "open";
   run.answersOpenAt = now;
   run.closesAt = closesAtFor(seg, now);
-  if (run.arena) run.arena.players = Object.values(state.players).filter((p) => !p.kicked).length;
+  if (run.arena) run.arena.players = Object.values(state.players).filter((p) => !p.kicked && !p.house).length;
 }
 
 function openNextOrEnd(state: RoomState, now: number, seed: number) {
@@ -864,8 +869,10 @@ export function closeSegment(state: RoomState, judgeAvailable: boolean, now: num
     return {};
   }
   if (seg.kind === "question" && isJudged(seg.question)) {
-    const hasText = Object.values(run.submissions).some(
-      (s) => (s.value.type === "written" || s.value.type === "debate") && s.value.text.trim(),
+    // House ducks' verdicts are already in; only real players need Jev.
+    const hasText = Object.entries(run.submissions).some(
+      ([pid, s]) =>
+        !state.players[pid]?.house && (s.value.type === "written" || s.value.type === "debate") && s.value.text.trim(),
     );
     if (judgeAvailable && hasText) {
       run.stage = "judging";
@@ -1532,11 +1539,12 @@ function publicPlayers(state: RoomState, connected: Set<string>): PublicPlayer[]
       id: p.id,
       name: p.name,
       teamId: p.teamId,
-      connected: connected.has(p.id),
+      connected: connected.has(p.id) || !!p.house,
       score: s.get(p.id) ?? 0,
       lookIndex: lookIndexOf(state, p),
       duckHolderId: p.duckHolderId,
       outfit: p.outfit ?? null,
+      ...(p.house && { house: true }),
     }))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 }
@@ -1721,10 +1729,11 @@ export function hostView(
       name: p.name,
       teamId: p.teamId,
       duckHolderId: p.duckHolderId,
-      connected: connected.has(p.id),
+      connected: connected.has(p.id) || !!p.house,
       score: s.get(p.id) ?? 0,
       lookIndex: lookIndexOf(state, p),
       outfit: p.outfit ?? null,
+      ...(p.house && { house: true }),
     }))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
   const run = state.run;

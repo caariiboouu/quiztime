@@ -5,7 +5,8 @@
  * Like the duck arena practice, it's for trying things out with whoever else
  * has the page open.
  */
-import { DEFAULT_DEBATE_LEVELS, type RoomSettings, type Show } from "./protocol";
+import isItPie from "../src/data/isItPie.json";
+import { DEFAULT_DEBATE_LEVELS, type DebateSide, type RoomSettings, type Show, type ShowSegment } from "./protocol";
 
 /**
  * The practice room's code. It has an O and an I in it, which real room codes
@@ -195,15 +196,115 @@ export const PRACTICE_SHOW: Show = {
         factoid: "Buffleheads are small diving ducks; the name comes from 'buffalo head', for the male's puffy head.",
       },
     },
+    // From the Is it pie? set, so its facts stay in one place.
+    pieDebate("pie-pumpkin"),
+  ],
+};
+
+function pieDebate(id: string): ShowSegment {
+  const seg = (isItPie as Show).segments.find((s) => s.kind === "question" && s.question.id === id);
+  if (!seg) throw new Error(`The Is it pie? set has no ${id}`);
+  return seg;
+}
+
+/**
+ * House ducks: the practice room's own, who sit in on every game and argue
+ * the debates (nothing else), so there's a back and forth to read out and
+ * facts turning over even with one person here. Their verdicts and facts are
+ * written down below rather than judged, so they cost nothing and work with
+ * Jev off. Two on each team.
+ */
+export const PRACTICE_HOUSE: readonly { name: string; teamId: string; lookIndex: number }[] = [
+  { name: "Pip (house)", teamId: "mallards", lookIndex: 200 },
+  { name: "Juniper (house)", teamId: "canvasbacks", lookIndex: 201 },
+  { name: "Biscuit (house)", teamId: "mallards", lookIndex: 202 },
+  { name: "Pickles (house)", teamId: "canvasbacks", lookIndex: 203 },
+];
+
+export type HouseArgument = {
+  /** Which house duck (index into PRACTICE_HOUSE). */
+  duck: number;
+  side: DebateSide;
+  text: string;
+  /** Its verdict, as an index into the question's levels (0 is the best). */
+  level: number;
+  /** Facts it brings up (by index), and facts it contradicts. Every other fact: not mentioned. */
+  uncovers?: number[];
+  bluffs?: number[];
+};
+
+/** What the house ducks argue, by debate id, in the order they argue it. */
+export const PRACTICE_HOUSE_ARGUMENTS: Record<string, readonly HouseArgument[]> = {
+  "d-hotdog": [
     {
-      kind: "question",
-      question: {
-        type: "debate",
-        id: "d-pineapple",
-        prompt: "This house believes pineapple belongs on pizza.",
-        levels: DEFAULT_DEBATE_LEVELS,
-        points: 200,
-      },
+      duck: 1,
+      side: "for",
+      text: "Merriam-Webster said in 2016 that a hot dog is a sandwich, because a sandwich can be a split roll with a filling. Case closed.",
+      level: 1,
+      uncovers: [0],
+    },
+    {
+      duck: 0,
+      side: "against",
+      text: "The National Hot Dog and Sausage Council ruled in 2015 that a hot dog is not a sandwich. It's a category of its own, and they'd know.",
+      level: 0,
+      uncovers: [2],
+    },
+    {
+      duck: 3,
+      side: "for",
+      text: "A sub roll is joined at the back too, and nobody says a sub isn't a sandwich.",
+      level: 2,
+    },
+    {
+      duck: 2,
+      side: "against",
+      text: "You can't cut a hot dog into triangles, so it can't be a sandwich.",
+      level: 3,
+    },
+  ],
+  "d-horse-duck": [
+    {
+      duck: 2,
+      side: "for",
+      text: "One big duck is one target. A hundred tiny horses come at you from every side, and you can't dodge four hundred hooves.",
+      level: 1,
+    },
+    {
+      duck: 3,
+      side: "against",
+      text: "A tiny horse is the size of a duck. A horse-sized duck has a beak the size of a car door and it is angry.",
+      level: 1,
+    },
+  ],
+  "pie-pumpkin": [
+    {
+      duck: 0,
+      side: "for",
+      text: "Illinois made pumpkin pie its official state pie in 2015. A state doesn't pass a law naming a pudding its state pie.",
+      level: 0,
+      uncovers: [0],
+    },
+    {
+      duck: 1,
+      side: "against",
+      text: "The British Pie Awards say a pie has to be wholly encased in pastry. Pumpkin pie has no top crust, so it's an open tart at best.",
+      level: 1,
+      uncovers: [3],
+    },
+    {
+      duck: 2,
+      side: "for",
+      text: "The first American cookbook, American Cookery from 1796, bakes its pumpkin filling in a crust. Filling in a crust is a pie.",
+      level: 1,
+      uncovers: [1],
+    },
+    {
+      duck: 3,
+      side: "against",
+      text: "Pumpkin pie only got a crust in the 1950s. Before that it was always baked in a mould, like a flan.",
+      level: 3,
+      bluffs: [1],
     },
   ],
 };
