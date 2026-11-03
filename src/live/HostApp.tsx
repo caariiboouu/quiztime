@@ -1,6 +1,9 @@
 import { useState } from "react";
 import sampleShow from "../data/liveSampleShow.json";
+import isItPie from "../data/isItPie.json";
 import type {
+  DebateFact,
+  FactMark,
   HostSubmission,
   HostView,
   RoomSettings,
@@ -49,8 +52,10 @@ import { MINIGAMES } from "./minigames";
 import { useRoom, useServerNow, type ArenaFeed } from "./useRoom";
 import { HostArena, HostLobbyArena } from "./arena/ArenaViews";
 import { DebatePanel } from "./debate/DebatePanel";
+import { ArgumentCard, FactBoard } from "./debate/FactBoard";
 import { debateNames } from "./debate/debateLayout";
 import { levelPoints } from "../../shared/scoring";
+import { factFits, factMark } from "../../shared/debateFacts";
 
 const DEFAULT_TEAMS: Team[] = [
   { id: "mallards", name: "Mallards", color: "#16a34a" },
@@ -159,6 +164,12 @@ function HostSetup({
     } catch (err) {
       setError(err instanceof SyntaxError ? "That file isn't valid JSON." : (err as Error).message);
     }
+  };
+
+  const loadSet = (show: Show) => {
+    if (dirty && !confirm(`Replace your unsaved changes with ${show.title}?`)) return;
+    setError(null);
+    setDraft(show);
   };
 
   const download = () => {
@@ -284,6 +295,13 @@ function HostSetup({
                 onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])}
               />
             </label>
+            <button
+              type="button"
+              onClick={() => loadSet(isItPie as Show)}
+              className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 font-medium hover:bg-neutral-100"
+            >
+              Load the Is it pie? set
+            </button>
             <button type="button" onClick={download} className="text-neutral-600 underline">
               Download a backup
             </button>
@@ -633,6 +651,16 @@ function HostConsole({
           </label>
         )}
         <div className="ml-auto flex items-center gap-2">
+          {view.segment?.reveal?.presenting && (
+            <button
+              type="button"
+              onClick={() => send({ t: "showResult" })}
+              title="Stop reading the arguments out and show who won"
+              className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-100"
+            >
+              Skip to the result
+            </button>
+          )}
           {view.phase === "segment" && (
             <button
               type="button"
@@ -716,9 +744,12 @@ function nextAction(view: HostView | null): string | null {
           return "Skip to review";
         case "review":
           return "Reveal scores";
-        case "revealed":
+        case "revealed": {
+          const p = seg.reveal?.presenting;
+          if (p) return p.step < p.total ? "Next argument" : "Show the result";
           if (seg.advanceAt !== null) return "Next now";
           return isLast ? "Finish" : "Next";
+        }
       }
   }
   return null;
@@ -876,6 +907,7 @@ function HostQuestion({
   const q = full.question;
   const revealed = seg.stage === "revealed";
   const showAnswer = revealed || peek;
+  const presenting = revealed ? seg.reveal?.presenting : undefined;
 
   if (seg.stage === "open" && now < seg.answersOpenAt && seg.round) {
     return <GetReady now={now} until={seg.answersOpenAt} title={seg.round.title} />;
@@ -931,8 +963,37 @@ function HostQuestion({
           levels={revealed ? seg.reveal?.levels : undefined}
           levelCount={seg.reveal?.levelCount}
           teams={view.settings.teamMode ? view.settings.teams : undefined}
+          spotlightId={presenting?.current.playerId}
         />
       )}
+
+      {presenting && q.type === "debate" && (
+        <div className="mx-auto max-w-4xl space-y-2">
+          <ArgumentCard
+            presenting={presenting}
+            names={debateNames(q.sides)}
+            players={view.players}
+            checked={seg.reveal?.factsChecked}
+            large
+          />
+          <p className="text-center text-sm text-neutral-500">
+            Read it out, then <strong>{presenting.step < presenting.total ? "Next argument" : "Show the result"}</strong>.
+            Points and the winner come after the last one.
+          </p>
+        </div>
+      )}
+      {q.type === "debate" && revealed && (seg.reveal?.facts?.length || seg.reveal?.debate) ? (
+        <div className="mx-auto max-w-5xl">
+          <FactBoard
+            facts={seg.reveal.facts ?? []}
+            names={debateNames(q.sides)}
+            players={view.players}
+            result={presenting ? undefined : seg.reveal.debate}
+            checked={seg.reveal.factsChecked}
+            large
+          />
+        </div>
+      ) : null}
 
       {seg.stage === "open" && <AnsweredCount view={view} />}
       {seg.stage === "closed" && <p className="text-center text-neutral-600">Answers locked.</p>}
@@ -950,7 +1011,7 @@ function HostQuestion({
           {q.type === "debate" && (
             <details className="mx-auto max-w-3xl rounded-2xl bg-white p-4 shadow-sm">
               <summary className="cursor-pointer text-sm font-semibold text-neutral-600">
-                Change a verdict (the pedestals and points follow)
+                Change a verdict or a fact (the pedestals and points follow)
               </summary>
               <div className="mt-3">
                 <DebateReview view={view} send={send} levels={q.levels} names={debateNames(q.sides)} />
@@ -1171,7 +1232,16 @@ function DebateReview({
       </p>
       <ul className="space-y-3">
         {subs.map((s) => (
-          <DebateRow key={s.playerId} sub={s} levels={levels} max={max} names={names} disabled={judging} send={send} />
+          <DebateRow
+            key={s.playerId}
+            sub={s}
+            levels={levels}
+            max={max}
+            names={names}
+            facts={full.question.type === "debate" ? full.question.facts : undefined}
+            disabled={judging}
+            send={send}
+          />
         ))}
         {subs.length === 0 && <li className="text-neutral-500">Nobody made an argument.</li>}
       </ul>
@@ -1184,6 +1254,7 @@ function DebateRow({
   levels,
   max,
   names,
+  facts = [],
   disabled,
   send,
 }: {
@@ -1191,6 +1262,7 @@ function DebateRow({
   levels: string[];
   max: number;
   names: { for: string; against: string };
+  facts?: DebateFact[];
   disabled: boolean;
   send: Send;
 }) {
@@ -1247,7 +1319,66 @@ function DebateRow({
           </button>
         ))}
       </div>
+      {facts.length > 0 && (
+        <div className="mt-3 space-y-1">
+          <p className="text-xs text-neutral-500">Facts: tap one to change what this argument did with it.</p>
+          <div className="flex flex-wrap gap-1.5">
+            {facts.map((fact, i) => (
+              <FactChip key={i} fact={fact} i={i} sub={sub} disabled={disabled} send={send} />
+            ))}
+          </div>
+        </div>
+      )}
     </li>
+  );
+}
+
+const MARK_LOOK: Record<FactMark | "unchecked", { label: string; cls: string }> = {
+  uncovered: { label: "🔓 uncovered", cls: "border-emerald-600 bg-emerald-600 text-white" },
+  bluff: { label: "🚨 bluff", cls: "border-rose-600 bg-rose-600 text-white" },
+  none: { label: "not used", cls: "border-neutral-300 bg-white text-neutral-700" },
+  unchecked: { label: "not checked", cls: "border-dashed border-neutral-400 bg-white text-neutral-500" },
+};
+
+/**
+ * One fact in one argument: Jev's call (✦) or yours. Each tap moves it on:
+ * not used → uncovered → bluff → not used. The other side's facts can only
+ * be bluffed, never uncovered.
+ */
+function FactChip({
+  fact,
+  i,
+  sub,
+  disabled,
+  send,
+}: {
+  fact: DebateFact;
+  i: number;
+  sub: HostSubmission;
+  disabled: boolean;
+  send: Send;
+}) {
+  if (sub.value.type !== "debate") return null;
+  const side = sub.value.side;
+  const fits = factFits(fact, side);
+  const override = sub.factMarks?.[i];
+  const mark = factMark(fact, i, side, sub.judge, override);
+  const next: FactMark = mark === "bluff" ? "none" : mark === "uncovered" || !fits ? "bluff" : "uncovered";
+  const look = MARK_LOOK[mark ?? "unchecked"];
+  const short = fact.text.length > 48 ? `${fact.text.slice(0, 46)}…` : fact.text;
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => send({ t: "setFact", playerId: sub.playerId, fact: i, mark: next })}
+      title={`${fact.text}\n${override === undefined ? "Jev's call" : "Your call"}. Tap for "${MARK_LOOK[next].label}".`}
+      aria-label={`Fact ${i + 1}, ${fact.text}: ${look.label}. Change to ${MARK_LOOK[next].label}`}
+      className={`max-w-full rounded-lg border px-2 py-1 text-left text-xs disabled:opacity-50 ${look.cls} ${fits ? "" : "opacity-80"}`}
+    >
+      <span className="font-semibold">{i + 1}.</span> {short}
+      {!fits && <span className="opacity-70"> (other side's)</span>} · <strong>{look.label}</strong>
+      {override === undefined && mark !== undefined && <span title="Jev's call"> ✦</span>}
+    </button>
   );
 }
 

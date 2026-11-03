@@ -44,6 +44,8 @@ export const PRACTICE_TIMING = {
   /** Longest wait for Jev before scoring what's back. */
   judging: 45,
   review: 1,
+  /** Each debate argument on screen, read out one at a time. */
+  argument: 9,
   /** Results on screen, then the team scores. */
   revealed: 12,
   leaderboard: 8,
@@ -96,6 +98,24 @@ export const PRACTICE_SHOW: Show = {
         prompt: "This house believes a hot dog is a sandwich.",
         levels: DEFAULT_DEBATE_LEVELS,
         points: 200,
+        sides: { for: "Sandwich", against: "Not a sandwich" },
+        // Checked against Merriam-Webster's 2016 "hot dog is a sandwich" post and
+        // the Council's November 2015 ruling (as reported by Mental Floss and others).
+        facts: [
+          {
+            text: "Merriam-Webster said in 2016 that a hot dog is a sandwich: its definition of a sandwich includes a split roll with a filling.",
+            side: "for",
+          },
+          {
+            text: "Hot dogs were once called \"frankfurter sandwiches\" or \"Coney Island sandwiches\".",
+            side: "for",
+          },
+          {
+            text: "In 2015 the National Hot Dog and Sausage Council ruled that a hot dog is not a sandwich but a category of its own.",
+            side: "against",
+          },
+        ],
+        winBonus: 100,
       },
     },
     {

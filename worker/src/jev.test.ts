@@ -234,6 +234,77 @@ describe("combineDebateAnswers", () => {
   });
 });
 
+const F: DebateQuestion = {
+  ...D,
+  facts: [
+    { text: "Pineapple on pizza was first served in Canada", side: "for" },
+    { text: "Cooked pineapple's enzymes break down cheese proteins", side: "against" },
+    { text: "Hawaiian pizza dates from 1962" },
+  ],
+};
+
+describe("debate facts", () => {
+  it("asks about each fact on the arguer's side, and checks every fact for bluffs", () => {
+    const req = buildDebateRequest("m", F, "for", "Sweet and salty, and it's Canadian");
+    expect(Object.keys(req.questions).sort()).toEqual([
+      "bluff_0",
+      "bluff_1",
+      "bluff_2",
+      "fact_0",
+      "fact_2",
+      "manipulation",
+      "on_side",
+      "strength",
+    ]);
+    expect(JSON.stringify(req.questions.fact_0)).toMatch(/first served in Canada/);
+    expect(JSON.stringify(req.questions.bluff_1)).toMatch(/enzymes/);
+  });
+
+  it("keeps the answer key out of the state Jev judges the argument by", () => {
+    const req = buildDebateRequest("m", F, "against", "x");
+    expect(JSON.stringify(req.state)).not.toMatch(/Canada|enzymes|1962/);
+    expect(JSON.stringify(req.questions.strength)).not.toMatch(/Canada|enzymes|1962/);
+  });
+
+  it("reads Jev's calls on each fact", () => {
+    const res = debateResponse(3);
+    res.answers.fact_0 = { type: "noul", noul: 0.95 };
+    res.answers.fact_2 = { type: "noul", noul: 0.05 };
+    res.answers.bluff_0 = { type: "noul", noul: 0 };
+    res.answers.bluff_1 = { type: "noul", noul: 0.9 };
+    res.answers.bluff_2 = { type: "noul", noul: 0.1 };
+    const r = combineDebateAnswers(F, res, "for");
+    expect(r.facts).toEqual([
+      { used: 0.95, contradicts: 0 },
+      { used: undefined, contradicts: 0.9 },
+      { used: 0.05, contradicts: 0.1 },
+    ]);
+    expect(r.flags).toEqual([]);
+  });
+
+  it("counts a fact Jev skipped as not found, and says so", () => {
+    const r = combineDebateAnswers(F, debateResponse(3), "against");
+    expect(r.level).toBe(1);
+    expect(r.facts).toEqual([
+      { used: undefined, contradicts: 0 },
+      { used: 0, contradicts: 0 },
+      { used: 0, contradicts: 0 },
+    ]);
+    expect(r.flags).toEqual(["Jev didn't check fact 1", "Jev didn't check fact 2", "Jev didn't check fact 3"]);
+  });
+
+  it("flags a call Jev couldn't make either way", () => {
+    const res = debateResponse(3);
+    for (const k of ["bluff_0", "bluff_1", "bluff_2", "fact_1", "fact_2"]) res.answers[k] = { type: "noul", noul: 0 };
+    res.answers.fact_1 = { type: "noul", noul: 0.5 };
+    expect(combineDebateAnswers(F, res, "against").flags).toEqual(["Borderline on fact 2"]);
+  });
+
+  it("leaves facts off a debate without any", () => {
+    expect(combineDebateAnswers(D, debateResponse(3)).facts).toBeUndefined();
+  });
+});
+
 describe("judgeWritten on a debate", () => {
   it("sends the side and returns a verdict", async () => {
     const f = vi.fn(async () => new Response(JSON.stringify(debateResponse(3)), { status: 200 }));

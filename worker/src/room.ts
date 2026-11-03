@@ -92,6 +92,8 @@ const HOST_MESSAGES = new Set<string>([
   "end",
   "setFinalPoints",
   "setLevel",
+  "setFact",
+  "showResult",
   "balanceTeams",
   "rejudge",
   "kick",

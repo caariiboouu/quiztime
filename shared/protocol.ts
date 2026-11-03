@@ -115,9 +115,31 @@ export type DebateQuestion = {
   /** What the two sides are called on screen. Default "For" / "Against". */
   sides?: { for: string; against: string };
   maxLength?: number;
+  /**
+   * The hidden fact board (see shared/debateFacts.ts): true facts that help
+   * one side or the other. An argument that brings one up for its own side,
+   * and gets it right, uncovers it; one that contradicts any fact is a bluff.
+   * Players see how many there are, never what they say, until the reveal.
+   */
+  facts?: DebateFact[];
+  /** Points for each fact a player uncovers; a bluff costs the same. Default DEFAULT_FACT_POINTS. */
+  factPoints?: number;
+  /**
+   * Points for everyone who argued on the side that wins: the side that
+   * uncovers more of its facts, else the one with the better arguments.
+   * Default 0 (no winner).
+   */
+  winBonus?: number;
 };
 
 export type DebateSide = "for" | "against";
+
+/** One fact on a debate's hidden board. */
+export type DebateFact = {
+  text: string;
+  /** The side it helps; left out, either side can uncover it. */
+  side?: DebateSide;
+};
 
 export const DEFAULT_DEBATE_LEVELS = [
   "Very good argument",
@@ -279,6 +301,12 @@ export type JudgeResult = {
   qualityConfidence?: number;
   /** Probability the answer tries to talk to/steer the grader. */
   manipulation?: number;
+  /**
+   * Debate: per fact on the board (same order), Jev's probability that the
+   * argument uncovered it (only asked for its own side's facts) and that it
+   * contradicted it.
+   */
+  facts?: { used?: number; contradicts: number }[];
   /** Reasons this one deserves a human look. */
   flags: string[];
   error?: string;
@@ -361,8 +389,14 @@ export type PublicQuestion =
   | Omit<NumericQuestion, "answer" | "factoid">
   | Omit<WrittenQuestion, "referenceAnswer" | "rubric">
   | PollQuestion
-  /** The verdict labels stay with the host; players see pedestals, not labels. */
-  | (Omit<DebateQuestion, "levels"> & { levelCount: number });
+  /**
+   * The verdict labels stay with the host; players see pedestals, not labels.
+   * The facts stay hidden too: players only learn how many each side has.
+   */
+  | (Omit<DebateQuestion, "levels" | "facts"> & {
+      levelCount: number;
+      factCounts?: Record<DebateSide, number>;
+    });
 
 export type SegmentReveal = {
   correctId?: string;
@@ -375,10 +409,56 @@ export type SegmentReveal = {
   /** Debate: each player's verdict (0 = best of `levelCount`), for pedestal heights. */
   levels?: Record<string, number>;
   levelCount?: number;
+  /** Debate: the fact board, turned over. */
+  facts?: RevealedFact[];
+  /** Debate: false when nobody checked the facts (Jev was off and the host marked none). */
+  factsChecked?: boolean;
+  /** Debate with a fact board or win bonus: who won (null: a draw) and by how much. */
+  debate?: DebateResult;
+  /**
+   * Debate: the host is reading the arguments out, one per Next, back and
+   * forth between the sides. Until the last one's read, players see only the
+   * arguments so far and the facts they uncovered: no points, no winner.
+   */
+  presenting?: DebatePresenting;
   /** Points awarded this segment, highest first. */
   awards: { playerId: string; name: string; points: number; detail?: string }[];
   /** On the last question of a lightning round: totals for the whole round. */
   roundTotals?: { playerId: string; name: string; points: number }[];
+};
+
+export type DebatePresenting = {
+  /** 1-based: the argument up now, of `total`. */
+  step: number;
+  total: number;
+  current: {
+    playerId: string;
+    side: DebateSide;
+    text: string;
+    /** Facts (indices into the board) this argument uncovered, and contradicted. */
+    uncovered: number[];
+    bluffed: number[];
+  };
+};
+
+export type RevealedFact = DebateFact & {
+  /** Still face down while the arguments are read out (its text is blank). */
+  hidden?: boolean;
+  /** Players who uncovered it, best argument first. */
+  uncoveredBy: string[];
+  /** Players whose argument contradicted it. */
+  bluffedBy: string[];
+  /** The best argument that uncovered it, shown with the fact. */
+  quote?: { playerId: string; text: string };
+};
+
+export type DebateResult = {
+  winner: DebateSide | null;
+  /** Each side's facts: how many it uncovered, of how many it had. */
+  facts: Record<DebateSide, { uncovered: number; total: number }>;
+  bonus: number;
+  /** How many argued each side (missing from rooms saved before it was added). */
+  argued?: Record<DebateSide, number>;
 };
 
 /** A finished game's results, once they've gone into the Duck Hours standings. */
@@ -432,7 +512,12 @@ export type HostSubmission = {
   finalPoints?: number;
   /** Debate: the host's verdict (defaults to Jev's suggested level). */
   finalLevel?: number;
+  /** Debate: the host's call on each fact (index → mark), over Jev's. */
+  factMarks?: Record<number, FactMark>;
 };
+
+/** What an argument did with one fact on the board. */
+export type FactMark = "uncovered" | "bluff" | "none";
 
 export type HostView = {
   role: "host";
@@ -488,6 +573,10 @@ export type HostMessage =
   | { t: "setFinalPoints"; playerId: string; points: number }
   /** Debate: the verdict for one argument (index into the levels, 0 = best). */
   | { t: "setLevel"; playerId: string; level: number }
+  /** Debate: the host's call on one fact in one argument (index into the facts). */
+  | { t: "setFact"; playerId: string; fact: number; mark: FactMark }
+  /** Debate: stop reading arguments out and show the result. */
+  | { t: "showResult" }
   /** Lobby, team mode: even the teams out by moving random ducks across. */
   | { t: "balanceTeams" }
   | { t: "rejudge" }

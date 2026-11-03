@@ -8,6 +8,7 @@ import {
   type Show,
   type ShowSegment,
 } from "../../../shared/protocol";
+import { MAX_DEBATE_FACTS } from "../../../shared/debateFacts";
 
 export const MAX_PROMPT = 1000;
 export const MAX_OPTION = 200;
@@ -65,6 +66,10 @@ export function showProblems(show: Show): string[] {
       if (q.sides && (!q.sides.for.trim() || !q.sides.against.trim())) {
         out.push(`Question ${i + 1} needs a name for both sides.`);
       }
+      if ((q.facts?.length ?? 0) > MAX_DEBATE_FACTS) {
+        out.push(`Question ${i + 1} has more than ${MAX_DEBATE_FACTS} facts.`);
+      }
+      if (q.facts?.some((f) => !f.text.trim())) out.push(`Question ${i + 1} has an empty fact.`);
       return;
     }
     if (q.options.some((o) => !o.text.trim())) out.push(`Question ${i + 1} has an empty answer.`);

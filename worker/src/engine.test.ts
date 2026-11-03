@@ -26,6 +26,7 @@ import {
 } from "./engine";
 import { addCall, NO_SPEND } from "../../shared/jevCost";
 import { EMPTY_LEDGER, ledgerSummary, recordGame } from "../../shared/jevLedger";
+import isItPie from "../../src/data/isItPie.json";
 
 const SHOW: Show = {
   title: "Test show",
@@ -828,6 +829,10 @@ describe("debate question", () => {
     expect(validateShow(dup)).toMatch(/different/);
   });
 
+  it("accepts the Is it pie? set", () => {
+    expect(validateShow(isItPie)).toBeNull();
+  });
+
   it("has no timer, shows sides (not arguments) to players, and trims long arguments", () => {
     const { room, t0 } = open();
     expect(room.run?.closesAt).toBeNull();
@@ -941,6 +946,251 @@ describe("debate question", () => {
     const pv = JSON.stringify(playerView(room, "p1", both, t0));
     expect(pv).not.toContain("allTime");
     expect(pv).not.toContain("Last week's show");
+  });
+});
+
+describe("debate fact board", () => {
+  const FACT_SHOW: Show = {
+    title: "Is it pie?",
+    segments: [
+      {
+        kind: "question",
+        question: {
+          type: "debate",
+          id: "d1",
+          prompt: "Boston cream pie is a pie",
+          levels: [...DEFAULT_DEBATE_LEVELS],
+          points: 50,
+          sides: { for: "Pie", against: "Not pie" },
+          facts: [
+            { text: "It is the official state dessert of Massachusetts", side: "for" },
+            { text: "Pie once meant any dish with a crust or casing", side: "for" },
+            { text: "It is two layers of sponge cake", side: "against" },
+            { text: "It was created at Boston's Parker House hotel" },
+          ],
+          factPoints: 25,
+          winBonus: 100,
+        },
+      },
+    ],
+  };
+  const three = new Set(["p1", "p2", "p3"]);
+  function open(judge = true) {
+    const t0 = 1_000_000;
+    const room = createRoom("ABCD", "hostkey", { show: FACT_SHOW, settings: SETTINGS }, t0);
+    for (const [id, name] of [["p1", "Ann"], ["p2", "Bob"], ["p3", "Cy"]]) {
+      addPlayer(room, { name, teamId: null, duckHolderId: null }, id, `tok-${id}`, t0);
+    }
+    hostAction(room, { t: "advance" }, { now: t0, seed: 1, judgeAvailable: judge });
+    return { room, t0 };
+  }
+  const judged = (level: number, facts: { used?: number; contradicts: number }[]) => ({
+    status: "ok" as const,
+    suggestedPoints: 0,
+    criteria: [],
+    flags: [],
+    level,
+    facts,
+  });
+  const none = { used: 0, contradicts: 0 };
+  const off = { contradicts: 0 };
+  /** Ann (Pie) finds two, Bob (Not pie) finds one, Cy (Not pie) bluffs. */
+  function argue(room: RoomState, t0: number) {
+    answer(room, "p1", "d1", { type: "debate", side: "for", text: "Massachusetts made it the state dessert" }, t0);
+    answer(room, "p2", "d1", { type: "debate", side: "against", text: "It's sponge cake" }, t0 + 1);
+    answer(room, "p3", "d1", { type: "debate", side: "against", text: "It was invented in Ohio" }, t0 + 2);
+    host(room, { t: "advance" }, t0);
+    applyJudgeResult(room, "d1", "p1", judged(0, [{ used: 0.9, contradicts: 0 }, none, off, { used: 0.8, contradicts: 0 }]));
+    applyJudgeResult(room, "d1", "p2", judged(0, [off, off, { used: 0.95, contradicts: 0 }, none]));
+    applyJudgeResult(room, "d1", "p3", judged(4, [off, off, none, { used: 0, contradicts: 0.9 }]));
+    finishJudging(room, "d1");
+  }
+
+  it("validates the board", () => {
+    expect(validateShow(FACT_SHOW)).toBeNull();
+    const q = () => {
+      const show = structuredClone(FACT_SHOW);
+      return { show, q: (show.segments[0] as { question: Record<string, unknown> }).question };
+    };
+    const many = q();
+    many.q.facts = Array.from({ length: 7 }, (_, i) => ({ text: `Fact ${i}` }));
+    expect(validateShow(many.show)).toMatch(/up to 6 facts/);
+    const long = q();
+    long.q.facts = [{ text: "x".repeat(201) }];
+    expect(validateShow(long.show)).toMatch(/1–200 characters/);
+    const side = q();
+    side.q.facts = [{ text: "Fine", side: "maybe" }];
+    expect(validateShow(side.show)).toMatch(/side/);
+    const bonus = q();
+    bonus.q.winBonus = -5;
+    expect(validateShow(bonus.show)).toMatch(/winBonus/);
+  });
+
+  it("keeps the facts from players until the reveal, but says how many each side has", () => {
+    const { room, t0 } = open();
+    const pv = playerView(room, "p1", three, t0);
+    const q = pv.segment?.kind === "question" ? pv.segment.question : null;
+    expect(q?.type === "debate" && q.factCounts).toEqual({ for: 3, against: 2 });
+    expect(JSON.stringify(pv)).not.toContain("Massachusetts");
+    expect(JSON.stringify(pv)).not.toContain("sponge");
+    expect(JSON.stringify(hostView(room, three, t0, true))).toContain("Massachusetts");
+  });
+
+  it("scores facts, bluffs and the win, and turns the board over", () => {
+    const { room, t0 } = open();
+    argue(room, t0);
+    host(room, { t: "advance" }, t0);
+    const reveal = room.run!.reveal!;
+    // Pie uncovered 2 of 3, Not pie 1 of 2: Pie wins.
+    expect(reveal.debate).toEqual({
+      winner: "for",
+      facts: { for: { uncovered: 2, total: 3 }, against: { uncovered: 1, total: 2 } },
+      bonus: 100,
+      argued: { for: 1, against: 2 },
+    });
+    expect(reveal.factsChecked).toBe(true);
+    expect(reveal.facts?.map((f) => f.uncoveredBy)).toEqual([["p1"], [], ["p2"], ["p1"]]);
+    expect(reveal.facts?.[3].bluffedBy).toEqual(["p3"]);
+    expect(reveal.facts?.[0].quote).toEqual({ playerId: "p1", text: "Massachusetts made it the state dessert" });
+    expect(reveal.facts?.[1].quote).toBeUndefined();
+
+    // Ann: best argument 50 + 2 facts + the win. Bob lost but argued well: 50 + 1 fact.
+    // Cy: nothing for the argument, a bluff, and never below zero.
+    expect(scores(room).get("p1")).toBe(200);
+    expect(scores(room).get("p2")).toBe(75);
+    expect(scores(room).get("p3") ?? 0).toBe(0);
+    expect(room.events.filter((e) => e.segmentId === "d1")).toHaveLength(3);
+    const detail = Object.fromEntries(reveal.awards.map((a) => [a.playerId, a.detail]));
+    expect(detail).toEqual({
+      p1: "+100 for winning · 2 facts uncovered",
+      p2: "1 fact uncovered",
+      p3: "1 bluff",
+    });
+  });
+
+  it("lets the host overrule Jev, keeps that through a re-judge, and re-scores after the reveal", () => {
+    const { room, t0 } = open();
+    argue(room, t0);
+    // Bob's argument also nailed the Parker House fact; Jev missed it.
+    host(room, { t: "setFact", playerId: "p2", fact: 3, mark: "uncovered" }, t0);
+    expect(hostView(room, three, t0, true).submissions.find((s) => s.playerId === "p2")?.factMarks).toEqual({
+      3: "uncovered",
+    });
+    expect(host(room, { t: "rejudge" }, t0).startJudging).toBe(true);
+    finishJudging(room, "d1");
+    host(room, { t: "advance" }, t0);
+    // Not pie now has 2 of 2 (the either-side fact counts for whoever found it), Pie lost Jev's calls.
+    expect(room.run?.reveal?.debate?.winner).toBe("against");
+    expect(room.run?.reveal?.facts?.[3].uncoveredBy).toEqual(["p2"]);
+
+    host(room, { t: "setFact", playerId: "p2", fact: 3, mark: "none" }, t0);
+    expect(room.run?.reveal?.facts?.[3].uncoveredBy).toEqual([]);
+    expect(room.run?.reveal?.factsChecked).toBe(true);
+  });
+
+  it("won't uncover a fact for the wrong side", () => {
+    const { room, t0 } = open();
+    argue(room, t0);
+    expect(() => host(room, { t: "setFact", playerId: "p2", fact: 0, mark: "uncovered" }, t0)).toThrow(
+      /other side/,
+    );
+    // …but can call it a bluff.
+    host(room, { t: "setFact", playerId: "p2", fact: 0, mark: "bluff" }, t0);
+    expect(() => host(room, { t: "setFact", playerId: "p2", fact: 9, mark: "bluff" }, t0)).toThrow(/fact/);
+    expect(() => host(room, { t: "setFact", playerId: "p2", fact: 1, mark: "maybe" as never }, t0)).toThrow(
+      /mark/,
+    );
+  });
+
+  it("settles a tie on the arguments, and past that calls a draw", () => {
+    const { room, t0 } = open();
+    answer(room, "p1", "d1", { type: "debate", side: "for", text: "State dessert" }, t0);
+    answer(room, "p2", "d1", { type: "debate", side: "against", text: "Sponge cake" }, t0 + 1);
+    host(room, { t: "advance" }, t0);
+    applyJudgeResult(room, "d1", "p1", judged(1, [none, none, off, none]));
+    applyJudgeResult(room, "d1", "p2", judged(0, [off, off, none, none]));
+    finishJudging(room, "d1");
+    host(room, { t: "advance" }, t0);
+    expect(room.run?.reveal?.debate?.winner).toBe("against");
+    host(room, { t: "setLevel", playerId: "p2", level: 1 }, t0);
+    expect(room.run?.reveal?.debate?.winner).toBeNull();
+    expect(scores(room).get("p1")).toBe(scores(room).get("p2"));
+  });
+
+  it("reads the arguments out one at a time, back and forth, before the result", () => {
+    const { room, t0 } = open();
+    argue(room, t0);
+    host(room, { t: "advance" }, t0);
+    const seen = () => playerView(room, "p2", three, t0);
+    const reveal = () => seen().segment!.reveal!;
+
+    // Ann (Pie) first, then Bob and Cy (Not pie) in the order they wrote.
+    expect(reveal().presenting).toMatchObject({
+      step: 1,
+      total: 3,
+      current: { playerId: "p1", side: "for", text: "Massachusetts made it the state dessert", uncovered: [0, 3], bluffed: [] },
+    });
+    expect(reveal().facts?.map((f) => (f.hidden ? null : f.text.slice(0, 12)))).toEqual([
+      "It is the of",
+      null,
+      null,
+      "It was creat",
+    ]);
+    expect(JSON.stringify(seen())).not.toContain("two layers");
+    // No points, no winner, nobody else on a pedestal yet.
+    expect(reveal().awards).toEqual([]);
+    expect(reveal().debate).toBeUndefined();
+    expect(reveal().levels).toEqual({ p1: 0 });
+    expect(seen().myAward).toBeNull();
+    expect(seen().players.find((p) => p.id === "p1")?.score).toBe(0);
+    expect(hostView(room, three, t0, true).players.find((p) => p.id === "p1")?.score).toBe(0);
+
+    host(room, { t: "advance" }, t0);
+    expect(reveal().presenting?.current.playerId).toBe("p2");
+    expect(reveal().facts?.[2].hidden).toBeUndefined();
+    host(room, { t: "advance" }, t0);
+    expect(reveal().presenting?.current).toMatchObject({ playerId: "p3", bluffed: [3] });
+    expect(reveal().facts?.[3].bluffedBy).toEqual(["p3"]);
+
+    // Back goes back an argument.
+    host(room, { t: "back" }, t0);
+    expect(reveal().presenting?.step).toBe(2);
+    host(room, { t: "advance" }, t0);
+
+    // Then the result, with everything turned over.
+    host(room, { t: "advance" }, t0);
+    expect(reveal().presenting).toBeUndefined();
+    expect(reveal().debate?.winner).toBe("for");
+    expect(reveal().debate?.argued).toEqual({ for: 1, against: 2 });
+    expect(reveal().facts?.[1]).toMatchObject({ text: "Pie once meant any dish with a crust or casing", uncoveredBy: [] });
+    expect(seen().myAward).toBe(75);
+    expect(seen().players.find((p) => p.id === "p1")?.score).toBe(200);
+    host(room, { t: "advance" }, t0);
+    expect(room.phase).toBe("ended");
+  });
+
+  it("lets the host skip to the result, and the scores give it away anyway", () => {
+    const { room, t0 } = open();
+    argue(room, t0);
+    host(room, { t: "advance" }, t0);
+    host(room, { t: "showResult" }, t0);
+    expect(playerView(room, "p1", three, t0).segment?.reveal?.debate?.winner).toBe("for");
+    host(room, { t: "back" }, t0);
+    expect(playerView(room, "p1", three, t0).segment?.reveal?.presenting?.step).toBe(1);
+    host(room, { t: "showLeaderboard" }, t0);
+    expect(room.run?.shown).toBe(4);
+    expect(playerView(room, "p1", three, t0).players.find((p) => p.id === "p1")?.score).toBe(200);
+  });
+
+  it("says when nobody checked the facts", () => {
+    const { room, t0 } = open(false);
+    answer(room, "p1", "d1", { type: "debate", side: "for", text: "State dessert" }, t0);
+    hostAction(room, { t: "advance" }, { now: t0, seed: 1, judgeAvailable: false });
+    host(room, { t: "advance" }, t0, false);
+    expect(room.run?.reveal?.factsChecked).toBe(false);
+    expect(room.run?.reveal?.facts?.every((f) => f.uncoveredBy.length === 0)).toBe(true);
+    // Only one side argued, so it wins on its arguments alone.
+    expect(room.run?.reveal?.debate?.winner).toBe("for");
   });
 });
 

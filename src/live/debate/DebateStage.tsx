@@ -7,8 +7,8 @@ import { debateLayout } from "./debateLayout";
 /**
  * The debate floor: everyone's duck, side-on. Pick a side and your duck hops
  * over to it; on the reveal the ducks rise on pedestals as tall as their
- * argument was good (the verdicts themselves aren't shown). Default export,
- * for lazy loading.
+ * argument was good (the verdicts themselves aren't shown), one at a time
+ * as the host reads the arguments out. Default export, for lazy loading.
  */
 export default function DebateStage({
   players,
@@ -18,6 +18,7 @@ export default function DebateStage({
   levelCount,
   meId = null,
   teams,
+  spotlightId = null,
 }: {
   players: PublicPlayer[];
   sides: Record<string, DebateSide>;
@@ -27,6 +28,8 @@ export default function DebateStage({
   meId?: string | null;
   /** Team mode: tags wear their team's colour. */
   teams?: Team[];
+  /** The duck whose argument is being read out: its tag lights up. */
+  spotlightId?: string | null;
 }) {
   const ordered = useMemo(() => [...players].sort((a, b) => a.lookIndex - b.lookIndex), [players]);
   const placeKey = JSON.stringify([ordered.map((p) => [p.id, sides[p.id] ?? null]), levels ?? null, levelCount ?? 0]);
@@ -70,13 +73,15 @@ export default function DebateStage({
           const p = byId.get(id);
           if (!p) return null;
           const team = p.teamId ? teamOf.get(p.teamId) : undefined;
+          const lit = id === spotlightId;
           return (
             <span
-              className={`block max-w-[5.5rem] truncate rounded-md border-2 bg-white/90 px-1 py-px text-[10px] font-bold leading-tight text-neutral-900 shadow-sm sm:max-w-[8rem] sm:text-[13px] ${
-                id === meId ? "ring-2 ring-amber-400" : ""
-              }`}
+              className={`block max-w-[5.5rem] truncate rounded-md border-2 px-1 py-px text-[10px] font-bold leading-tight shadow-sm sm:max-w-[8rem] sm:text-[13px] ${
+                lit ? "scale-125 bg-amber-300 text-neutral-950" : "bg-white/90 text-neutral-900"
+              } ${id === meId ? "ring-2 ring-amber-400" : ""}`}
               style={{ borderColor: team?.color ?? "rgba(255,255,255,0.7)" }}
             >
+              {lit && <span aria-hidden>🎤 </span>}
               {p.name}
             </span>
           );

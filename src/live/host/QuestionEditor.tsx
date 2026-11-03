@@ -4,10 +4,12 @@ import {
   MAX_DEBATE_LENGTH,
   MAX_DEBATE_LEVELS,
   MIN_DEBATE_LEVELS,
+  type DebateFact,
   type DebateQuestion,
   type Show,
   type ShowSegment,
 } from "../../../shared/protocol";
+import { DEFAULT_FACT_POINTS, MAX_DEBATE_FACTS, MAX_FACT_LENGTH } from "../../../shared/debateFacts";
 import { levelPoints } from "../../../shared/scoring";
 import {
   DEFAULT_POINTS,
@@ -26,7 +28,7 @@ import {
 /**
  * Edit the saved question set: title, and for each multiple-choice question
  * or poll its text, 2–4 answers (pick the correct one), points and seconds;
- * for a debate, its verdicts (best first), side names and points.
+ * for a debate, its verdicts (best first), hidden facts, side names and points.
  * Other kinds of segment (minigames, lightning rounds, typed answers) come
  * from show files; here they can be moved or removed.
  */
@@ -353,6 +355,10 @@ function DebateFields({ q, onChange }: { q: DebateQuestion; onChange: (q: Editab
   };
   const names = q.sides ?? { for: "For", against: "Against" };
   const n = q.levels.length;
+  const facts = q.facts ?? [];
+  const setFacts = (list: DebateFact[]) => onChange({ ...q, facts: list.length ? list : undefined });
+  const setFact = (i: number, fact: DebateFact) => setFacts(facts.map((f, j) => (j === i ? fact : f)));
+  const points = (v: string) => Math.max(0, Math.min(10000, Number(v) || 0));
 
   return (
     <div className="space-y-3">
@@ -419,6 +425,83 @@ function DebateFields({ q, onChange }: { q: DebateQuestion; onChange: (q: Editab
           </button>
         </div>
       </fieldset>
+      <fieldset className="space-y-1.5">
+        <legend className="mb-1 text-xs text-neutral-500">
+          Hidden facts (optional, up to {MAX_DEBATE_FACTS}): true things that help one side. Players only see how many
+          each side has. An argument that gets one right for its own side uncovers it; one that contradicts any fact is
+          a bluff and loses points. Jev checks every argument and you can overrule it. The side that uncovers more of
+          its facts wins.
+        </legend>
+        {facts.map((f, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="w-5 text-right text-xs text-neutral-400">{i + 1}</span>
+            <select
+              value={f.side ?? ""}
+              aria-label={`Who fact ${i + 1} helps`}
+              onChange={(e) => {
+                const side = e.target.value;
+                setFact(i, side === "for" || side === "against" ? { text: f.text, side } : { text: f.text });
+              }}
+              className="w-32 rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+            >
+              <option value="for">{names.for || "Left side"}</option>
+              <option value="against">{names.against || "Right side"}</option>
+              <option value="">Either side</option>
+            </select>
+            <input
+              value={f.text}
+              maxLength={MAX_FACT_LENGTH}
+              aria-label={`Fact ${i + 1}`}
+              placeholder="A true, checkable fact"
+              onChange={(e) => setFact(i, { ...f, text: e.target.value })}
+              className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-1.5"
+            />
+            <button
+              type="button"
+              aria-label={`Remove fact ${i + 1}`}
+              onClick={() => setFacts(facts.filter((_, j) => j !== i))}
+              className="rounded px-2 py-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        {facts.length < MAX_DEBATE_FACTS && (
+          <button
+            type="button"
+            onClick={() => setFacts([...facts, { text: "", side: facts.length % 2 ? "against" : "for" }])}
+            className="ml-7 text-sm text-neutral-600 underline"
+          >
+            + Add a fact
+          </button>
+        )}
+      </fieldset>
+      <div className="flex flex-wrap gap-4 text-sm">
+        {facts.length > 0 && (
+          <label className="flex items-center gap-2">
+            Points per fact
+            <input
+              type="number"
+              min={0}
+              max={10000}
+              value={q.factPoints ?? DEFAULT_FACT_POINTS}
+              onChange={(e) => onChange({ ...q, factPoints: points(e.target.value) })}
+              className="w-20 rounded-md border border-neutral-300 px-2 py-1"
+            />
+          </label>
+        )}
+        <label className="flex items-center gap-2" title="For everyone who argued on the side that wins. 0: no winner.">
+          Winning side bonus
+          <input
+            type="number"
+            min={0}
+            max={10000}
+            value={q.winBonus ?? 0}
+            onChange={(e) => onChange({ ...q, winBonus: points(e.target.value) || undefined })}
+            className="w-20 rounded-md border border-neutral-300 px-2 py-1"
+          />
+        </label>
+      </div>
       <div className="flex flex-wrap gap-4 text-sm">
         <label className="flex items-center gap-2">
           Points for the best

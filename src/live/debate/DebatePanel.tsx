@@ -6,7 +6,10 @@ const DebateStage = lazy(() => import("./DebateStage"));
 /** The debate floor, lazy-loaded, with a plain list where 3D isn't possible. */
 export function DebatePanel(props: ComponentProps<typeof DebateStage>) {
   if (!hasWebGL()) {
-    const side = (s: "for" | "against") => props.players.filter((p) => props.sides[p.id] === s).map((p) => p.name);
+    const side = (s: "for" | "against") =>
+      props.players
+        .filter((p) => props.sides[p.id] === s)
+        .map((p) => (p.id === props.spotlightId ? `🎤 ${p.name}` : p.name));
     return (
       <div className="grid grid-cols-2 gap-3 rounded-2xl bg-white p-4 text-sm shadow-sm">
         <p>

@@ -1,0 +1,346 @@
+{
+  "title": "Is it pie?",
+  "segments": [
+    {
+      "kind": "question",
+      "question": {
+        "type": "debate",
+        "id": "pie-pumpkin",
+        "prompt": "Pumpkin pie: is it really a pie?",
+        "levels": [
+          "Very good argument",
+          "Good argument",
+          "Neutral",
+          "Poor argument",
+          "Very poor argument"
+        ],
+        "points": 50,
+        "sides": {
+          "for": "Pie",
+          "against": "Not pie"
+        },
+        "facts": [
+          {
+            "text": "Illinois made pumpkin pie its official state pie in 2015.",
+            "side": "for"
+          },
+          {
+            "text": "The 1796 cookbook American Cookery bakes its pumpkin filling in a crust.",
+            "side": "for"
+          },
+          {
+            "text": "The 1796 cookbook American Cookery lists its pumpkin recipes under the heading Puddings.",
+            "side": "against"
+          },
+          {
+            "text": "The British Pie Awards define a pie as a filling wholly encased in pastry and baked, and pumpkin pie has no top crust.",
+            "side": "against"
+          },
+          {
+            "text": "America's Test Kitchen's Dan Souza calls pumpkin pie essentially a custard baked into a pie shell."
+          }
+        ],
+        "factPoints": 25,
+        "winBonus": 100
+      }
+    },
+    {
+      "kind": "question",
+      "question": {
+        "type": "debate",
+        "id": "pie-pecan",
+        "prompt": "Pecan pie: is it really a pie?",
+        "levels": [
+          "Very good argument",
+          "Good argument",
+          "Neutral",
+          "Poor argument",
+          "Very poor argument"
+        ],
+        "points": 50,
+        "sides": {
+          "for": "Pie",
+          "against": "Not pie"
+        },
+        "facts": [
+          {
+            "text": "Texas named pecan pie its official State Pie in 2013; the resolution passed the Senate 31-0 and the House 134-0.",
+            "side": "for"
+          },
+          {
+            "text": "Texas's 2013 resolution says pecan pie appeared in The Joy of Cooking and The Fannie Farmer Cookbook in the 1940s.",
+            "side": "for"
+          },
+          {
+            "text": "The American Heritage Dictionary defines a tart as a pastry shell with shallow sides and no top crust, and pecan pie has no top crust.",
+            "side": "against"
+          },
+          {
+            "text": "The British Pie Awards won't judge an open-topped pie: the filling must be wholly encased in pastry, with any lid hole no wider than 25mm.",
+            "side": "against"
+          },
+          {
+            "text": "Texas's resolution cites a 1914 Christian Science Monitor recipe for Texas Pecan Pie with a custard filling."
+          },
+          {
+            "text": "Texas's resolution says that around 1930 the wife of a Karo Syrup executive combined Karo with pecans to make a pie."
+          }
+        ],
+        "factPoints": 25,
+        "winBonus": 100
+      }
+    },
+    {
+      "kind": "question",
+      "question": {
+        "type": "debate",
+        "id": "pie-cobbler",
+        "prompt": "Peach cobbler: is it a pie?",
+        "levels": [
+          "Very good argument",
+          "Good argument",
+          "Neutral",
+          "Poor argument",
+          "Very poor argument"
+        ],
+        "points": 50,
+        "sides": {
+          "for": "Pie",
+          "against": "Not pie"
+        },
+        "facts": [
+          {
+            "text": "The American Heritage Dictionary defines a cobbler as a deep-dish fruit pie with a thick top crust.",
+            "side": "for"
+          },
+          {
+            "text": "The American Heritage Dictionary defines pie as ingredients baked over, under, or surrounded by a crust of pastry or other dough.",
+            "side": "for"
+          },
+          {
+            "text": "Oxford Learner's Dictionaries define a pie as a baked dish with pastry on the bottom, sides and top.",
+            "side": "against"
+          },
+          {
+            "text": "The British Pie Awards define a pie as a filling wholly encased in pastry and baked.",
+            "side": "against"
+          },
+          {
+            "text": "The American Heritage Dictionary defines a crumble as fruit topped with a crumbly pastry mixture, and a crisp as fruit baked with a sweet crumbly topping."
+          }
+        ],
+        "factPoints": 25,
+        "winBonus": 100
+      }
+    },
+    {
+      "kind": "question",
+      "question": {
+        "type": "debate",
+        "id": "pie-boston-cream",
+        "prompt": "Boston cream pie: is it really a pie?",
+        "levels": [
+          "Very good argument",
+          "Good argument",
+          "Neutral",
+          "Poor argument",
+          "Very poor argument"
+        ],
+        "points": 50,
+        "sides": {
+          "for": "Pie",
+          "against": "Not pie"
+        },
+        "facts": [
+          {
+            "text": "The American Heritage Dictionary's second sense of pie is a layer cake with a cream, custard or jelly filling.",
+            "side": "for"
+          },
+          {
+            "text": "Parker House chef Gerard Tice has said the cake was originally baked in pie tins.",
+            "side": "for"
+          },
+          {
+            "text": "Parker House historian Susan Wilson told GBH the words pie and cake were sometimes used interchangeably.",
+            "side": "for"
+          },
+          {
+            "text": "The Omni Parker House's historian, Susan Wilson, says: \"It's never been a pie, never will be a pie. It's always a cake.\"",
+            "side": "against"
+          },
+          {
+            "text": "The American Heritage Dictionary defines Boston cream pie as a round cake with a custard or cream filling.",
+            "side": "against"
+          },
+          {
+            "text": "Massachusetts law makes Boston cream pie the official dessert of the commonwealth."
+          }
+        ],
+        "factPoints": 25,
+        "winBonus": 100
+      }
+    },
+    {
+      "kind": "question",
+      "question": {
+        "type": "debate",
+        "id": "pie-whoopie",
+        "prompt": "Whoopie pie: is it really a pie?",
+        "levels": [
+          "Very good argument",
+          "Good argument",
+          "Neutral",
+          "Poor argument",
+          "Very poor argument"
+        ],
+        "points": 50,
+        "sides": {
+          "for": "Pie",
+          "against": "Not pie"
+        },
+        "facts": [
+          {
+            "text": "The American Heritage Dictionary's second sense of pie is a layer cake with a cream, custard or jelly filling.",
+            "side": "for"
+          },
+          {
+            "text": "Maine law describes the whoopie pie as a baked good made of 2 cakes with a creamy frosting between them.",
+            "side": "against"
+          },
+          {
+            "text": "Maine's 2011 law made blueberry pie the official state dessert and the whoopie pie only the official state treat.",
+            "side": "against"
+          },
+          {
+            "text": "In 2011 Pennsylvania Dutch tourism officials protested Maine's whoopie pie bill with a petition and a rally."
+          }
+        ],
+        "factPoints": 25,
+        "winBonus": 100
+      }
+    },
+    {
+      "kind": "question",
+      "question": {
+        "type": "debate",
+        "id": "pie-shoofly",
+        "prompt": "Shoofly pie, the Pennsylvania Dutch molasses dessert: is it really a pie?",
+        "levels": [
+          "Very good argument",
+          "Good argument",
+          "Neutral",
+          "Poor argument",
+          "Very poor argument"
+        ],
+        "points": 50,
+        "sides": {
+          "for": "Pie",
+          "against": "Not pie"
+        },
+        "facts": [
+          {
+            "text": "The American Heritage Dictionary defines shoofly pie as a pie with a filling of molasses and brown sugar and a crumble topping.",
+            "side": "for"
+          },
+          {
+            "text": "A historic marker in Telford, Pennsylvania calls shoofly a molasses-based pie with crumb topping.",
+            "side": "for"
+          },
+          {
+            "text": "The shoofly pie marker in Telford, Pennsylvania says it's believed to have developed from an 1876 Centennial cake recipe.",
+            "side": "against"
+          },
+          {
+            "text": "The British Pie Awards define a pie as a filling wholly encased in pastry and baked.",
+            "side": "against"
+          }
+        ],
+        "factPoints": 25,
+        "winBonus": 100
+      }
+    },
+    {
+      "kind": "question",
+      "question": {
+        "type": "debate",
+        "id": "pie-tarte-tatin",
+        "prompt": "Tarte Tatin, the upside-down apple tart: is it a pie?",
+        "levels": [
+          "Very good argument",
+          "Good argument",
+          "Neutral",
+          "Poor argument",
+          "Very poor argument"
+        ],
+        "points": 50,
+        "sides": {
+          "for": "Pie",
+          "against": "Not pie"
+        },
+        "facts": [
+          {
+            "text": "Oxford Learner's Dictionaries define a tart as an open pie.",
+            "side": "for"
+          },
+          {
+            "text": "The American Heritage Dictionary gives \"a pie\" as the chiefly British meaning of tart.",
+            "side": "for"
+          },
+          {
+            "text": "The American Heritage Dictionary defines a tart as a pastry shell with shallow sides and no top crust.",
+            "side": "against"
+          },
+          {
+            "text": "The British Pie Awards define a pie as a filling wholly encased in pastry and baked.",
+            "side": "against"
+          },
+          {
+            "text": "A tarte Tatin is baked with the pastry laid over the apples, then turned upside down to serve."
+          }
+        ],
+        "factPoints": 25,
+        "winBonus": 100
+      }
+    },
+    {
+      "kind": "question",
+      "question": {
+        "type": "debate",
+        "id": "pie-cherpumple",
+        "prompt": "The cherpumple, a layer cake with whole pies baked inside: is it a pie?",
+        "levels": [
+          "Very good argument",
+          "Good argument",
+          "Neutral",
+          "Poor argument",
+          "Very poor argument"
+        ],
+        "points": 50,
+        "sides": {
+          "for": "Pie",
+          "against": "Not pie"
+        },
+        "facts": [
+          {
+            "text": "Charles Phoenix's cherpumple bakes three pies, cherry, pumpkin and apple, inside three layers of cake.",
+            "side": "for"
+          },
+          {
+            "text": "The American Heritage Dictionary defines pie as ingredients baked over, under, or surrounded by a crust of pastry or other dough.",
+            "side": "for"
+          },
+          {
+            "text": "The cherpumple is iced with cream cheese frosting, like a layer cake.",
+            "side": "against"
+          },
+          {
+            "text": "Oxford Learner's Dictionaries define a pie as a baked dish with pastry on the bottom, sides and top.",
+            "side": "against"
+          }
+        ],
+        "factPoints": 25,
+        "winBonus": 100
+      }
+    }
+  ]
+}

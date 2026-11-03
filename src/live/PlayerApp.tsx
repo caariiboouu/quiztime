@@ -42,8 +42,10 @@ import { hasWebGL } from "./minigames/three/fallbackContext";
 import { useGraphicsPref } from "./minigames/useGraphicsPref";
 import { useRoom, useServerNow, type ArenaFeed, type RoomStatus } from "./useRoom";
 import { PlayerArena, PlayerLobby } from "./arena/ArenaViews";
+import { DEFAULT_FACT_POINTS } from "../../shared/debateFacts";
 import { DebateInput } from "./debate/DebateInput";
 import { DebatePanel } from "./debate/DebatePanel";
+import { ArgumentCard, FactBoard } from "./debate/FactBoard";
 import { debateNames } from "./debate/debateLayout";
 import { OutfitPicker } from "./account/OutfitPicker";
 import { WhoAreYou } from "./account/WhoAreYou";
@@ -610,6 +612,9 @@ function QuestionStage({
   const q = seg.question!;
   const open = seg.stage === "open";
   const revealed = seg.stage === "revealed";
+  // A debate's arguments being read out: no points or winner yet.
+  const presenting = revealed ? seg.reveal?.presenting : undefined;
+  const myDetail = seg.reveal?.awards.find((a) => a.playerId === view.me.id)?.detail;
   const answer = (value: AnswerValue) => send({ t: "answer", segmentId: seg.id, value });
 
   const status = open
@@ -705,15 +710,23 @@ function QuestionStage({
             levelCount={seg.reveal?.levelCount}
             meId={view.me.id}
             teams={view.settings.teamMode ? view.settings.teams : undefined}
+            spotlightId={presenting?.current.playerId}
           />
-          <DebateInput
-            segmentId={seg.id}
-            names={debateNames(q.sides)}
-            maxLength={q.maxLength || MAX_DEBATE_LENGTH}
-            disabled={!open}
-            submitted={view.myAnswer?.type === "debate" ? view.myAnswer : null}
-            onSend={(side, text) => answer({ type: "debate", side, text })}
-          />
+          {!revealed && (
+            <DebateInput
+              segmentId={seg.id}
+              names={debateNames(q.sides)}
+              maxLength={q.maxLength || MAX_DEBATE_LENGTH}
+              disabled={!open}
+              submitted={view.myAnswer?.type === "debate" ? view.myAnswer : null}
+              onSend={(side, text) => answer({ type: "debate", side, text })}
+              board={{
+                counts: q.factCounts,
+                factPoints: q.factPoints ?? DEFAULT_FACT_POINTS,
+                winBonus: q.winBonus ?? 0,
+              }}
+            />
+          )}
         </>
       )}
 
@@ -723,9 +736,27 @@ function QuestionStage({
         </p>
       )}
 
-      {revealed && (
+      {presenting && q.type === "debate" && (
+        <div className="space-y-2">
+          <ArgumentCard
+            presenting={presenting}
+            names={debateNames(q.sides)}
+            players={view.players}
+            checked={seg.reveal?.factsChecked}
+            meId={view.me.id}
+          />
+          <p className="text-center text-sm text-neutral-600" aria-live="polite">
+            The host is reading the arguments out. Points come after the last one.
+          </p>
+        </div>
+      )}
+
+      {revealed && !presenting && (
         <div className="space-y-3 rounded-2xl bg-white p-5 shadow-sm">
           {q.type !== "poll" && <ResultLine view={view} />}
+          {q.type === "debate" && myDetail && (
+            <p className="text-center text-neutral-600">{myDetail}</p>
+          )}
           {q.type === "numeric" && seg.reveal?.answer !== undefined && (
             <p className="text-center text-lg">
               Answer: <strong>{seg.reveal.answer}</strong> {seg.reveal.unit}
@@ -740,6 +771,16 @@ function QuestionStage({
           <NextIn now={now} at={seg.advanceAt} />
         </div>
       )}
+      {q.type === "debate" && revealed && (seg.reveal?.facts?.length || seg.reveal?.debate) ? (
+        <FactBoard
+          facts={seg.reveal.facts ?? []}
+          names={debateNames(q.sides)}
+          players={view.players}
+          result={presenting ? undefined : seg.reveal.debate}
+          checked={seg.reveal.factsChecked}
+          meId={view.me.id}
+        />
+      ) : null}
       {revealed && seg.round && seg.reveal?.roundTotals && (
         <RoundTotals
           title={seg.round.title}

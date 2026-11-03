@@ -13,7 +13,17 @@ import {
   PRACTICE_SHOW,
   PRACTICE_TIMING as T,
 } from "../../shared/practice";
-import { createRoom, currentSegment, hostAction, isJudged, type Effects, type RoomState } from "./engine";
+import {
+  createRoom,
+  currentSegment,
+  hostAction,
+  isJudged,
+  presentation,
+  type Effects,
+  type RoomState,
+} from "./engine";
+
+const presenting = (state: RoomState) => presentation(state) !== null;
 
 export type Autopilot = {
   /** Where the game was when `at` was set (phase, question, stage). */
@@ -55,7 +65,7 @@ export function createPracticeRoom(hostKey: string, now: number): RoomState {
 
 function markOf(state: RoomState): string {
   if (state.phase === "lobby") return `lobby:${state.autopilot?.balanced ? "balanced" : "open"}`;
-  return `${state.phase}:${state.cursor}:${state.run?.stage ?? ""}`;
+  return `${state.phase}:${state.cursor}:${state.run?.stage ?? ""}:${state.run?.shown ?? ""}`;
 }
 
 function here(state: RoomState, connected: Set<string>): string[] {
@@ -121,7 +131,9 @@ function due(state: RoomState, ctx: AutopilotContext): number | null {
       return now + T.review * 1000;
     case "revealed":
       // Lightning rounds move themselves on.
-      return run.advanceAt !== null ? null : now + T.revealed * 1000;
+      if (run.advanceAt !== null) return null;
+      // A debate's arguments, one at a time, then its result.
+      return now + (presenting(state) ? T.argument : T.revealed) * 1000;
   }
 }
 
@@ -159,7 +171,7 @@ function act(state: RoomState, ctx: AutopilotContext): Effects | null {
       return press("advance");
     }
     case "segment":
-      return state.run?.stage === "revealed" ? press("showLeaderboard") : press("advance");
+      return state.run?.stage === "revealed" && !presenting(state) ? press("showLeaderboard") : press("advance");
     case "leaderboard":
       return press("advance");
     case "ended":

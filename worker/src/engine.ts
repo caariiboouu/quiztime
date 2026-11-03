@@ -17,8 +17,10 @@ import {
   MAX_TEAMS,
   MIN_TEAMS,
   type AnswerValue,
+  type DebatePresenting,
   type DebateQuestion,
   type DebateSide,
+  type FactMark,
   type ChoiceQuestion,
   type CreateRoomRequest,
   type HostMessage,
@@ -49,6 +51,16 @@ import {
   type DuckHoursResult,
 } from "../../shared/protocol";
 import { cleanOutfit, type DuckOutfit } from "../../shared/outfit";
+import {
+  DEFAULT_FACT_POINTS,
+  MAX_DEBATE_FACTS,
+  MAX_FACT_LENGTH,
+  debateWinner,
+  factCounts,
+  factFits,
+  factMark,
+  type Argued,
+} from "../../shared/debateFacts";
 import { ranksFromScores } from "../../shared/duckStandings";
 import { addCall, NO_SPEND, sumSpend, type JevCall, type JevSpend } from "../../shared/jevCost";
 import { gameKey, type JevLedgerSummary } from "../../shared/jevLedger";
@@ -111,6 +123,13 @@ export type SegmentRun = {
   finalPoints: Record<string, number>;
   /** Debate: host-confirmed verdicts (index into the levels, 0 = best). */
   levels?: Record<string, number>;
+  /** Debate: the host's calls on the fact board, player → fact index → mark. */
+  factMarks?: Record<string, Record<number, FactMark>>;
+  /**
+   * Debate reveal: how many arguments have been read out (see debateOrder).
+   * Past the last one the result's up; unset, everything is (older rooms).
+   */
+  shown?: number;
   reveal: SegmentReveal | null;
 };
 
@@ -258,6 +277,25 @@ function questionError(q: LiveQuestion, where: string): string | null {
       }
       if (q.maxLength !== undefined && !isNum(q.maxLength, 50, MAX_DEBATE_LENGTH)) {
         return `${where}: maxLength must be 50–${MAX_DEBATE_LENGTH}`;
+      }
+      if (q.facts !== undefined) {
+        if (!Array.isArray(q.facts) || q.facts.length > MAX_DEBATE_FACTS) {
+          return `${where}: a debate can hide up to ${MAX_DEBATE_FACTS} facts`;
+        }
+        for (const f of q.facts) {
+          if (!isStr(f?.text, MAX_FACT_LENGTH)) {
+            return `${where}: each fact must be 1–${MAX_FACT_LENGTH} characters`;
+          }
+          if (f.side !== undefined && f.side !== "for" && f.side !== "against") {
+            return `${where}: a fact's side must be "for", "against", or left out for either`;
+          }
+        }
+      }
+      if (q.factPoints !== undefined && !isNum(q.factPoints, 0, 10000)) {
+        return `${where}: factPoints must be 0–10000`;
+      }
+      if (q.winBonus !== undefined && !isNum(q.winBonus, 0, 10000)) {
+        return `${where}: winBonus must be 0–10000`;
       }
       return null;
     default:
@@ -980,20 +1018,12 @@ export function revealSegment(state: RoomState) {
         }
         break;
       }
-      case "debate": {
-        reveal.levels = {};
-        reveal.levelCount = q.levels.length;
-        for (const [pid, s] of subs) {
-          if (s.value.type !== "debate") continue;
-          const level = debateLevel(run, q, pid);
-          const pts = levelPoints(level, q.levels.length, q.points);
-          reveal.levels[pid] = level;
+      case "debate":
+        revealDebate(run, q, subs, reveal, (pid, pts, detail) => {
           state.events.push({ playerId: pid, segmentId: segId, kind: "judge", points: pts });
-          // No verdict beside the points: the pedestals say it without words.
-          award(pid, pts);
-        }
+          award(pid, pts, detail);
+        });
         break;
-      }
       case "poll": {
         reveal.distribution = Object.fromEntries(q.options.map((o) => [o.id, 0]));
         for (const [, s] of subs) {
@@ -1012,6 +1042,169 @@ export function revealSegment(state: RoomState) {
   }
   run.reveal = reveal;
   run.stage = "revealed";
+}
+
+/**
+ * Debate scoring: verdict points for every argument, whichever side wins,
+ * plus `factPoints` for each fact on the board it uncovered and minus the
+ * same for each it contradicted, plus the win bonus for the winning side.
+ * One total per player (never below 0), so the leaderboard needs nothing new.
+ */
+function revealDebate(
+  run: SegmentRun,
+  q: DebateQuestion,
+  subs: [string, Submission][],
+  reveal: SegmentReveal,
+  score: (playerId: string, points: number, detail?: string) => void,
+) {
+  const n = q.levels.length;
+  const facts = q.facts ?? [];
+  reveal.levels = {};
+  reveal.levelCount = n;
+
+  const argued: (Argued & { text: string; at: number; marks: (FactMark | undefined)[] })[] = [];
+  for (const [pid, s] of subs) {
+    const sub = s.value;
+    if (sub.type !== "debate") continue;
+    const level = debateLevel(run, q, pid);
+    reveal.levels[pid] = level;
+    const verdictPoints = levelPoints(level, n, q.points);
+    if (!sub.text.trim()) {
+      score(pid, verdictPoints);
+      continue;
+    }
+    argued.push({
+      playerId: pid,
+      side: sub.side,
+      verdictPoints,
+      text: sub.text,
+      at: s.at,
+      marks: facts.map((f, i) => factMark(f, i, sub.side, run.judge[pid], run.factMarks?.[pid]?.[i])),
+    });
+  }
+  // Best argument first, so each fact quotes the best one that found it.
+  argued.sort((a, b) => b.verdictPoints - a.verdictPoints || a.at - b.at);
+
+  const uncovered: Record<DebateSide, Set<number>> = { for: new Set(), against: new Set() };
+  if (facts.length) {
+    reveal.facts = facts.map((f, i) => {
+      const by = argued.filter((a) => a.marks[i] === "uncovered");
+      for (const a of by) uncovered[a.side].add(i);
+      return {
+        ...f,
+        uncoveredBy: by.map((a) => a.playerId),
+        bluffedBy: argued.filter((a) => a.marks[i] === "bluff").map((a) => a.playerId),
+        quote: by[0] && { playerId: by[0].playerId, text: by[0].text },
+      };
+    });
+    reveal.factsChecked = argued.some((a) => a.marks.some((m) => m !== undefined));
+  }
+  if (facts.length || (q.winBonus ?? 0) > 0) reveal.debate = debateWinner(q, argued, uncovered);
+
+  const factPoints = q.factPoints ?? DEFAULT_FACT_POINTS;
+  const winner = reveal.debate?.winner;
+  for (const a of argued) {
+    const found = a.marks.filter((m) => m === "uncovered").length;
+    const bluffs = a.marks.filter((m) => m === "bluff").length;
+    const won = winner === a.side && reveal.debate!.bonus > 0;
+    const total = a.verdictPoints + (found - bluffs) * factPoints + (won ? reveal.debate!.bonus : 0);
+    const detail = [
+      won && `+${reveal.debate!.bonus} for winning`,
+      found && `${found} fact${found === 1 ? "" : "s"} uncovered`,
+      bluffs && `${bluffs} bluff${bluffs === 1 ? "" : "s"}`,
+    ].filter(Boolean);
+    // With no fact board or bonus, no detail: the pedestals say it without words.
+    score(a.playerId, Math.max(0, total), detail.length ? detail.join(" · ") : undefined);
+  }
+}
+
+/**
+ * The order a debate's arguments are read out in: back and forth between the
+ * sides, starting with "for", each side in the order it was written. Blank
+ * arguments are skipped.
+ */
+export function debateOrder(state: RoomState): string[] {
+  const run = state.run;
+  if (!run) return [];
+  const bySide = (side: DebateSide) =>
+    Object.entries(run.submissions)
+      .filter(([pid, s]) => {
+        const p = state.players[pid];
+        return p && !p.kicked && s.value.type === "debate" && s.value.side === side && s.value.text.trim();
+      })
+      .sort(([, a], [, b]) => a.at - b.at)
+      .map(([pid]) => pid);
+  const [a, b] = [bySide("for"), bySide("against")];
+  return Array.from({ length: Math.max(a.length, b.length) }, (_, i) => [a[i], b[i]])
+    .flat()
+    .filter((id): id is string => id !== undefined);
+}
+
+function isDebate(seg: Segment | null | undefined): boolean {
+  return seg?.kind === "question" && seg.question.type === "debate";
+}
+
+/** The debate reveal being read out, or null once its result is up (or it isn't one). */
+export function presentation(state: RoomState): { order: string[]; shown: number } | null {
+  const run = state.run;
+  const seg = currentSegment(state);
+  if (state.phase !== "segment" || run?.stage !== "revealed" || run.shown === undefined) return null;
+  if (!isDebate(seg)) return null;
+  const order = debateOrder(state);
+  return run.shown <= order.length ? { order, shown: run.shown } : null;
+}
+
+/** What everyone sees of a debate reveal while it's read out: only what's been read. */
+function presentedReveal(
+  run: SegmentRun,
+  full: SegmentReveal,
+  { order, shown }: { order: string[]; shown: number },
+): SegmentReveal {
+  const read = new Set(order.slice(0, shown));
+  const textOf = (pid: string) => {
+    const v = run.submissions[pid]?.value;
+    return v?.type === "debate" ? v.text : "";
+  };
+  const id = order[shown - 1];
+  const sub = run.submissions[id].value as Extract<AnswerValue, { type: "debate" }>;
+  const current: DebatePresenting["current"] = {
+    playerId: id,
+    side: sub.side,
+    text: sub.text,
+    uncovered: [],
+    bluffed: [],
+  };
+  const facts = full.facts?.map((f, i) => {
+    if (f.uncoveredBy.includes(id)) current.uncovered.push(i);
+    if (f.bluffedBy.includes(id)) current.bluffed.push(i);
+    const by = f.uncoveredBy.filter((p) => read.has(p));
+    if (!by.length) return { text: "", side: f.side, hidden: true, uncoveredBy: [], bluffedBy: [] };
+    return {
+      ...f,
+      uncoveredBy: by,
+      bluffedBy: f.bluffedBy.filter((p) => read.has(p)),
+      quote: { playerId: by[0], text: textOf(by[0]) },
+    };
+  });
+  return {
+    awards: [],
+    levels: Object.fromEntries(Object.entries(full.levels ?? {}).filter(([p]) => read.has(p))),
+    levelCount: full.levelCount,
+    facts,
+    factsChecked: full.factsChecked,
+    presenting: { step: shown, total: order.length, current },
+  };
+}
+
+/** Scores as shown on screen: a debate's points stay out until its result is up. */
+function shownScores(state: RoomState): Map<string, number> {
+  if (!presentation(state)) return scores(state);
+  const segId = segmentId(currentSegment(state)!);
+  const out = new Map<string, number>();
+  for (const e of state.events) {
+    if (e.segmentId !== segId) out.set(e.playerId, (out.get(e.playerId) ?? 0) + e.points);
+  }
+  return out;
 }
 
 function roundTotals(state: RoomState, roundId: string): SegmentReveal["roundTotals"] {
@@ -1068,15 +1261,28 @@ export function hostAction(
         case "closed":
         case "review":
           revealSegment(state);
+          if (isDebate(currentSegment(state)) && debateOrder(state).length) run.shown = 1;
           return {};
         case "judging":
           // Waiting on Jev; the host can skip ahead to review what's back.
           run.stage = "review";
           return {};
         case "revealed":
+          // Reading a debate's arguments out: Next is the next one, then the result.
+          if (presentation(state)) {
+            run.shown! += 1;
+            return {};
+          }
           openNextOrEnd(state, ctx.now, ctx.seed);
           return {};
       }
+      return {};
+    }
+    case "showResult": {
+      const p = presentation(state);
+      if (!p) return {};
+      remember(state, ctx.now);
+      state.run!.shown = p.order.length + 1;
       return {};
     }
     case "close":
@@ -1087,9 +1293,13 @@ export function hostAction(
     case "applyDuckHours":
       // Talks to the standings, so the Durable Object handles it (room.ts).
       return {};
-    case "showLeaderboard":
+    case "showLeaderboard": {
+      // The scores give the result away, so it's up once they are.
+      const p = presentation(state);
+      if (p) state.run!.shown = p.order.length + 1;
       if (state.phase === "segment") state.phase = "leaderboard";
       return {};
+    }
     case "end":
       if (state.phase !== "ended") remember(state, ctx.now);
       state.phase = "ended";
@@ -1131,6 +1341,31 @@ export function hostAction(
       if (run.stage === "revealed") revealSegment(state);
       return {};
     }
+    case "setFact": {
+      const run = state.run;
+      const seg = currentSegment(state);
+      if (!run || !seg || seg.kind !== "question" || seg.question.type !== "debate") {
+        throw new RuleError("Not on a debate");
+      }
+      if (run.stage !== "review" && run.stage !== "revealed") {
+        throw new RuleError("Wait for judging to finish");
+      }
+      const sub = run.submissions[msg.playerId]?.value;
+      if (sub?.type !== "debate") throw new RuleError("No argument from that player");
+      const i = Number(msg.fact);
+      const fact = Number.isInteger(i) ? seg.question.facts?.[i] : undefined;
+      if (!fact) throw new RuleError("Unknown fact");
+      if (!FACT_MARKS.includes(msg.mark)) throw new RuleError("Unknown mark");
+      if (msg.mark === "uncovered" && !factFits(fact, sub.side)) {
+        throw new RuleError("That fact is the other side's to uncover");
+      }
+      run.factMarks = {
+        ...run.factMarks,
+        [msg.playerId]: { ...run.factMarks?.[msg.playerId], [i]: msg.mark },
+      };
+      if (run.stage === "revealed") revealSegment(state);
+      return {};
+    }
     case "balanceTeams":
       return { teamMoves: balanceTeams(state, seededRng(ctx.seed)) };
     case "rejudge": {
@@ -1159,6 +1394,8 @@ export function hostAction(
     }
   }
 }
+
+const FACT_MARKS: readonly FactMark[] = ["uncovered", "bluff", "none"];
 
 function validAnswer(seg: Segment, value: AnswerValue): AnswerValue {
   if (seg.kind === "minigame") {
@@ -1288,7 +1525,7 @@ function lookIndexOf(state: RoomState, p: PlayerRecord): number {
 }
 
 function publicPlayers(state: RoomState, connected: Set<string>): PublicPlayer[] {
-  const s = scores(state);
+  const s = shownScores(state);
   return Object.values(state.players)
     .filter((p) => !p.kicked)
     .map((p) => ({
@@ -1327,8 +1564,11 @@ export function publicQuestion(q: LiveQuestion): PublicQuestion {
     case "poll":
       return q;
     case "debate": {
-      const { levels, ...rest } = q;
-      return { ...rest, levelCount: levels.length };
+      // The fact board stays hidden until the reveal; players only see how many.
+      const { levels, facts, ...rest } = q;
+      return facts?.length
+        ? { ...rest, levelCount: levels.length, factCounts: factCounts(facts) }
+        : { ...rest, levelCount: levels.length };
     }
   }
 }
@@ -1376,8 +1616,13 @@ function publicSegment(state: RoomState, connected: Set<string>): PublicSegment 
       seg.kind === "minigame"
         ? { game: seg.game, seed: run.seed, durationSec: seg.durationSec, points: seg.points }
         : undefined,
-    reveal: run.reveal ?? undefined,
+    reveal: run.reveal ? presentedOr(state, run, run.reveal) : undefined,
   };
+}
+
+function presentedOr(state: RoomState, run: SegmentRun, reveal: SegmentReveal): SegmentReveal {
+  const p = presentation(state);
+  return p ? presentedReveal(run, reveal, p) : reveal;
 }
 
 function publicQna(state: RoomState, viewerId: string | null): PublicQna[] {
@@ -1416,7 +1661,8 @@ export function playerView(
   };
   const seg = currentSegment(state);
   const segId = seg ? segmentId(seg) : null;
-  const revealed = state.run?.stage === "revealed";
+  // A debate's points wait until its arguments have all been read out.
+  const revealed = state.run?.stage === "revealed" && !presentation(state);
   return {
     role: "player",
     duckHours: state.duckHours ?? null,
@@ -1467,7 +1713,7 @@ export function hostView(
   allTime: JevLedgerSummary | null = null,
 ): HostView {
   const canGoBack = (state.undo?.length ?? 0) > 0;
-  const s = scores(state);
+  const s = shownScores(state);
   const players = Object.values(state.players)
     .filter((p) => !p.kicked)
     .map((p) => ({
@@ -1493,6 +1739,7 @@ export function hostView(
           judge: run.judge[pid],
           finalPoints: run.finalPoints[pid],
           finalLevel: run.levels?.[pid],
+          factMarks: run.factMarks?.[pid],
         }))
         .sort((a, b) => a.elapsedMs - b.elapsedMs)
     : [];
