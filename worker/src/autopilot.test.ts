@@ -19,6 +19,7 @@ import {
 } from "./autopilot";
 import {
   addPlayer,
+  applyJudgeResult,
   currentSegment,
   expandShow,
   finishJudging,
@@ -206,6 +207,45 @@ describe("autopilot", () => {
     run(room2, t + 1000, here, true);
     run(room2, t + 1000 + T.review * 1000, here, true);
     expect(room2.run?.stage).toBe("revealed");
+  });
+
+  it("gives a written answer Jev couldn't judge half marks, with nobody to score it by hand", () => {
+    const here = new Set(["p1", "p2"]);
+    const toWritten = (room: RoomState, judge: boolean) =>
+      until(room, t0, here, () => {
+        const seg = currentSegment(room);
+        return seg?.kind === "question" && seg.question.type === "written" && room.run?.stage === "open";
+      }, judge);
+    const write = (room: RoomState, id: string, text: string, now: number) =>
+      playerAction(
+        room,
+        id,
+        { t: "answer", segmentId: "w-bread", value: { type: "written", text } },
+        { now, connected: here, judgeAvailable: true, newId: "n" },
+      );
+    const points = (room: RoomState, id: string) => room.run?.reveal?.awards.find((a) => a.playerId === id)?.points;
+
+    // Jev fails on one and scores the other.
+    const room = practice();
+    let now = toWritten(room, true);
+    write(room, "p1", "It rots in the pond.", now);
+    write(room, "p2", "No nutrients, angel wing, and rats.", now);
+    now = until(room, now, here, () => room.run?.stage === "judging", true);
+    applyJudgeResult(room, "w-bread", "p1", { status: "error", suggestedPoints: 0, criteria: [], flags: [] });
+    applyJudgeResult(room, "w-bread", "p2", { status: "ok", suggestedPoints: 120, criteria: [], flags: [] });
+    finishJudging(room, "w-bread");
+    until(room, now, here, () => room.run?.stage === "revealed", true);
+    expect(points(room, "p1")).toBe(75);
+    expect(points(room, "p2")).toBe(120);
+
+    // Out of Jev altogether: anything written gets half; nothing written, nothing.
+    const room2 = practice();
+    const t = toWritten(room2, false);
+    write(room2, "p1", "It rots in the pond.", t);
+    write(room2, "p2", "  ", t);
+    until(room2, t, here, () => room2.run?.stage === "revealed");
+    expect(points(room2, "p1")).toBe(75);
+    expect(points(room2, "p2")).toBe(0);
   });
 });
 

@@ -183,12 +183,30 @@ function act(state: RoomState, ctx: AutopilotContext): Effects | null {
       return press("advance");
     }
     case "segment":
+      if (state.run?.stage === "review") scoreUnjudged(state);
       return state.run?.stage === "revealed" && !presenting(state) ? press("showLeaderboard") : press("advance");
     case "leaderboard":
       return press("advance");
     case "ended":
       restartGame(state, ctx);
       return {};
+  }
+}
+
+/**
+ * Nobody's hosting to score by hand what Jev couldn't (it failed, was out of
+ * the day's calls, or was still thinking): a written answer with no verdict
+ * gets half marks, as a debate argument sits in the middle (see debateLevel).
+ */
+function scoreUnjudged(state: RoomState) {
+  const run = state.run!;
+  const seg = currentSegment(state);
+  if (seg?.kind !== "question" || seg.question.type !== "written") return;
+  const half = Math.round(seg.question.points / 2);
+  for (const [id, s] of Object.entries(run.submissions)) {
+    if (s.value.type !== "written" || !s.value.text.trim() || run.finalPoints[id] !== undefined) continue;
+    const verdict = run.judge[id];
+    if (!verdict || verdict.status === "error") run.finalPoints[id] = half;
   }
 }
 
