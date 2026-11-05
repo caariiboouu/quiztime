@@ -27,6 +27,7 @@ import {
 } from "./api";
 import {
   AnswerPad,
+  AnsweredCount,
   Banner,
   GetReady,
   Leaderboard,
@@ -35,6 +36,7 @@ import {
   RoundTotals,
   SegmentBadges,
   TimerBar,
+  TopAwards,
 } from "./components";
 import { useControls } from "./controls";
 import { Mascot } from "./mascot/Mascot";
@@ -856,38 +858,6 @@ function HostStage({
   );
 }
 
-function AnsweredCount({ view }: { view: HostView }) {
-  const seg = view.segment!;
-  return (
-    <p className="text-center text-lg text-neutral-600" aria-live="polite">
-      <strong className="text-2xl tabular-nums text-neutral-900">{seg.answeredCount}</strong> /{" "}
-      {seg.eligibleCount} answered
-    </p>
-  );
-}
-
-function TopAwards({ view }: { view: HostView }) {
-  const awards = view.segment?.reveal?.awards ?? [];
-  if (awards.length === 0) return null;
-  return (
-    <div className="mx-auto max-w-xl rounded-2xl bg-white p-5 shadow-sm">
-      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
-        Top this round
-      </h3>
-      <ol className="space-y-1">
-        {awards.slice(0, 5).map((a, i) => (
-          <li key={a.playerId} className="flex gap-3">
-            <span className="w-6 text-neutral-400">{i + 1}</span>
-            <span className="flex-1 font-semibold">{a.name}</span>
-            {a.detail && <span className="text-sm text-neutral-500">{a.detail}</span>}
-            <span className="w-16 text-right font-bold tabular-nums">+{a.points}</span>
-          </li>
-        ))}
-      </ol>
-    </div>
-  );
-}
-
 function HostQuestion({
   view,
   send,
@@ -935,7 +905,7 @@ function HostQuestion({
       )}
 
       {(q.type === "choice" || q.type === "poll") && q.arena && (
-        <HostArena view={view} options={q.options} feed={feed} />
+        <HostArena seg={seg} players={view.players} live={view.liveDistribution} options={q.options} feed={feed} />
       )}
 
       {(q.type === "choice" || q.type === "poll") && !q.arena && (
@@ -995,7 +965,7 @@ function HostQuestion({
         </div>
       ) : null}
 
-      {seg.stage === "open" && <AnsweredCount view={view} />}
+      {seg.stage === "open" && <AnsweredCount seg={seg} />}
       {seg.stage === "closed" && <p className="text-center text-neutral-600">Answers locked.</p>}
 
       {q.type === "written" && (seg.stage === "judging" || seg.stage === "review") && (
@@ -1029,7 +999,7 @@ function HostQuestion({
           {seg.reveal?.roundTotals && seg.round ? (
             <RoundTotals title={seg.round.title} totals={seg.reveal.roundTotals} />
           ) : (
-            <TopAwards view={view} />
+            <TopAwards seg={seg} />
           )}
           <NextIn now={now} at={seg.advanceAt} />
         </>
@@ -1402,8 +1372,8 @@ function HostMinigame({ view, offsetMs }: { view: HostView; offsetMs: number }) 
         ) : (
           <TimerBar now={now} openedAt={startAt} closesAt={endAt} />
         ))}
-      {seg.stage !== "revealed" && <AnsweredCount view={view} />}
-      {seg.stage === "revealed" && <TopAwards view={view} />}
+      {seg.stage !== "revealed" && <AnsweredCount seg={seg} />}
+      {seg.stage === "revealed" && <TopAwards seg={seg} />}
     </div>
   );
 }

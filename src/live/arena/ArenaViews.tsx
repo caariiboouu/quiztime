@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { arenaLayout, lobbyLayout, teamLobbyLayout } from "../../../shared/arena";
-import type { HostView, PlayerView, PublicPlayer, PublicSegment, RoomSettings } from "../../../shared/protocol";
+import type { PlayerView, PublicPlayer, PublicSegment, RoomSettings } from "../../../shared/protocol";
 import { useDuckLeader } from "../duckStore";
 import { lookFor } from "../mascot/variants";
 import type { DuckOutfit } from "../../../shared/outfit";
@@ -161,19 +161,26 @@ export function ArenaView({
   );
 }
 
-/** The presenter's view: the whole arena, plus how many ducks stand on each answer. */
+/**
+ * The presenter's view (and the practice room's projector): the whole arena,
+ * plus how many ducks stand on each answer.
+ */
 export function HostArena({
-  view,
+  seg,
+  players,
+  live,
   options,
   feed,
 }: {
-  view: HostView;
+  seg: PublicSegment;
+  players: PublicPlayer[];
+  /** While it's open: the live count on each answer. */
+  live: Record<string, number> | null;
   options: Options;
   feed: { current: ArenaFeed };
 }) {
-  const seg = view.segment!;
-  const { layout, members, source, reveal } = useArena(seg, options, view.players, feed);
-  const counts = seg.stage === "revealed" ? seg.reveal?.distribution : view.liveDistribution;
+  const { layout, members, source, reveal } = useArena(seg, options, players, feed);
+  const counts = seg.stage === "revealed" ? seg.reveal?.distribution : live;
   return (
     <div className="space-y-3">
       <ArenaPanel

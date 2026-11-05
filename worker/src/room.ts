@@ -36,6 +36,7 @@ import {
   playerByToken,
   playerView,
   roomInfo,
+  watchView,
   segmentId,
   tick,
   type Effects,
@@ -82,7 +83,11 @@ const ARENA_TICK_MS = 100;
 /** …but full room state (answer counts) at most this often. */
 const ARENA_STATE_MS = 300;
 
-type Attachment = { role: "host" } | { role: "player"; playerId: string };
+/** "watch": the practice room's projector, which sees what players see and can't act. */
+type Attachment = { role: "host" } | { role: "player"; playerId: string } | { role: "watch" };
+
+/** Projectors one practice room will feed at once. */
+const MAX_SCREENS = 10;
 
 const HOST_MESSAGES = new Set<string>([
   "advance",
@@ -208,11 +213,7 @@ export class Room extends DurableObject<Env> {
    */
   async joinPractice(name: unknown): Promise<PracticeJoinResponse | { error: string }> {
     const now = Date.now();
-    if (!this.room) {
-      this.room = createPracticeRoom(randomToken(), now);
-      logEvent("practice_room_created", {});
-    }
-    const room = this.room;
+    const room = await this.practiceRoom(now);
     const ap = room.autopilot;
     if (!ap) return { error: "That room isn't a practice room" };
     if (this.connected().size >= PRACTICE_MAX_PLAYERS) {
@@ -242,19 +243,41 @@ export class Room extends DurableObject<Env> {
     }
   }
 
+  /** The practice room, set up first if it isn't running (or it expired). */
+  private async practiceRoom(now: number): Promise<RoomState> {
+    if (!this.room) {
+      this.room = createPracticeRoom(randomToken(), now);
+      logEvent("practice_room_created", {});
+      await this.save();
+    }
+    return this.room;
+  }
+
   // ---- WebSockets ----------------------------------------------------------
 
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("Expected a WebSocket", { status: 426 });
     }
+    const url = new URL(request.url);
+    // The practice room's projector (index.ts only sends this path to that
+    // room). A projector put up before anyone's joined, or left up after the
+    // room expired, brings it back; watching alone doesn't keep it alive.
+    const watch = url.pathname === "/api/practice/ws";
+    if (watch) await this.practiceRoom(Date.now());
     if (!this.room) return new Response("Room not found", { status: 404 });
 
-    const url = new URL(request.url);
     const hostKey = url.searchParams.get("host");
     const token = url.searchParams.get("token");
     let attachment: Attachment;
-    if (hostKey && timingSafeEqual(hostKey, this.room.hostKey)) {
+    if (watch) {
+      if (!this.room.autopilot) return new Response("Not a practice room", { status: 403 });
+      const screens = this.ctx
+        .getWebSockets()
+        .filter((ws) => (ws.deserializeAttachment() as Attachment).role === "watch").length;
+      if (screens >= MAX_SCREENS) return new Response("Too many screens", { status: 429 });
+      attachment = { role: "watch" };
+    } else if (hostKey && timingSafeEqual(hostKey, this.room.hostKey)) {
       attachment = { role: "host" };
     } else if (token) {
       const player = playerByToken(this.room, token);
@@ -713,6 +736,7 @@ export class Room extends DurableObject<Env> {
     const now = Date.now();
     const connected = this.connected();
     let hostPayload: string | null = null;
+    let watchPayload: string | null = null;
     for (const ws of this.ctx.getWebSockets()) {
       if (ws.readyState !== WebSocket.OPEN) continue;
       const a = ws.deserializeAttachment() as Attachment;
@@ -723,6 +747,12 @@ export class Room extends DurableObject<Env> {
           view: hostView(room, connected, now, this.judgeAvailable, this.jevLedger),
         } satisfies ServerMessage);
         ws.send(hostPayload);
+      } else if (a.role === "watch") {
+        watchPayload ??= JSON.stringify({
+          t: "state",
+          view: watchView(room, connected, now, this.judgeAvailable),
+        } satisfies ServerMessage);
+        ws.send(watchPayload);
       } else {
         this.send(ws, { t: "state", view: playerView(room, a.playerId, connected, now, this.judgeAvailable) });
       }

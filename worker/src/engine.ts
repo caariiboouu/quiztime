@@ -49,6 +49,7 @@ import {
   type ShowSegment,
   type Submission,
   type DuckHoursResult,
+  type WatchView,
 } from "../../shared/protocol";
 import { cleanOutfit, type DuckOutfit } from "../../shared/outfit";
 import {
@@ -1597,6 +1598,16 @@ function publicSegment(state: RoomState, connected: Set<string>): PublicSegment 
   const seg = currentSegment(state);
   if (!run || !seg) return null;
   const eligible = eligiblePlayers(state, connected);
+  const answered = Object.entries(run.submissions).filter(
+    ([id, sub]) =>
+      state.players[id] &&
+      !state.players[id].kicked &&
+      // A debate side with nothing argued yet doesn't count as an answer.
+      (sub.value.type !== "debate" || sub.value.text.trim() !== ""),
+  );
+  // House ducks have no socket, so they count as there once they've answered
+  // (they argue the debates and sit the rest out).
+  const houseAnswered = answered.filter(([id]) => state.players[id].house).length;
   return {
     index: run.index,
     total: state.segments.length,
@@ -1610,14 +1621,8 @@ function publicSegment(state: RoomState, connected: Set<string>): PublicSegment 
     speedScored: isSpeedScored(seg, state.settings),
     round: seg.kind === "question" ? seg.round : undefined,
     arena: run.arena ?? undefined,
-    answeredCount: Object.entries(run.submissions).filter(
-      ([id, sub]) =>
-        state.players[id] &&
-        !state.players[id].kicked &&
-        // A debate side with nothing argued yet doesn't count as an answer.
-        (sub.value.type !== "debate" || sub.value.text.trim() !== ""),
-    ).length,
-    eligibleCount: eligible.length,
+    answeredCount: answered.length,
+    eligibleCount: eligible.length + houseAnswered,
     sides: debateSides(state),
     question: seg.kind === "question" ? publicQuestion(seg.question) : undefined,
     minigame:
@@ -1690,6 +1695,28 @@ export function playerView(
           .reduce((s, e) => s + e.points, 0)
       : null,
     qna: publicQna(state, playerId),
+    autopilot: state.autopilot ? { nextAt: state.autopilot.at, judged } : null,
+  };
+}
+
+/**
+ * The practice room's projector: what every player sees, with nobody's own
+ * answer or points. The segment is the same public one players get.
+ */
+export function watchView(state: RoomState, connected: Set<string>, now: number, judged = true): WatchView {
+  const players = publicPlayers(state, connected);
+  return {
+    role: "watch",
+    duckHours: state.duckHours ?? null,
+    code: state.code,
+    title: state.title,
+    serverNow: now,
+    phase: state.phase,
+    settings: state.settings,
+    players,
+    teams: teamStandings(state.settings.teams, players, state.settings.teamScoring),
+    segment: publicSegment(state, connected),
+    liveDistribution: livePollDistribution(state),
     autopilot: state.autopilot ? { nextAt: state.autopilot.at, judged } : null,
   };
 }

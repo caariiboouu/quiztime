@@ -557,7 +557,30 @@ export type HostView = {
   };
 };
 
-export type RoomView = PlayerView | HostView;
+/**
+ * The practice room's projector (#/live/test/screen): everything a player
+ * sees on the shared parts of their screen, and nothing of anyone's own.
+ * The same public segment players get, so a debate's facts stay hidden until
+ * they're turned over. `liveDistribution` is the host screen's live tally,
+ * which only covers polls and arena questions (where everyone can see the
+ * ducks standing anyway).
+ */
+export type WatchView = {
+  role: "watch";
+  duckHours: DuckHoursResult | null;
+  code: string;
+  title: string;
+  serverNow: number;
+  phase: RoomPhase;
+  settings: RoomSettings;
+  players: PublicPlayer[];
+  teams: TeamStanding[];
+  segment: PublicSegment | null;
+  liveDistribution: Record<string, number> | null;
+  autopilot: { nextAt: number | null; judged: boolean } | null;
+};
+
+export type RoomView = PlayerView | HostView | WatchView;
 
 // ---------------------------------------------------------------------------
 // Messages

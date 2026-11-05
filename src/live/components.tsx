@@ -468,3 +468,34 @@ export function RoundTotals({
     </div>
   );
 }
+
+export function AnsweredCount({ seg }: { seg: PublicSegment }) {
+  return (
+    <p className="text-center text-lg text-neutral-600" aria-live="polite">
+      <strong className="text-2xl tabular-nums text-neutral-900">{seg.answeredCount}</strong> /{" "}
+      {seg.eligibleCount} answered
+    </p>
+  );
+}
+
+export function TopAwards({ seg }: { seg: PublicSegment }) {
+  const awards = seg.reveal?.awards ?? [];
+  if (awards.length === 0) return null;
+  return (
+    <div className="mx-auto max-w-xl rounded-2xl bg-white p-5 shadow-sm">
+      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
+        Top this round
+      </h3>
+      <ol className="space-y-1">
+        {awards.slice(0, 5).map((a, i) => (
+          <li key={a.playerId} className="flex gap-3">
+            <span className="w-6 text-neutral-400">{i + 1}</span>
+            <span className="flex-1 font-semibold">{a.name}</span>
+            {a.detail && <span className="text-sm text-neutral-500">{a.detail}</span>}
+            <span className="w-16 text-right font-bold tabular-nums">+{a.points}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}

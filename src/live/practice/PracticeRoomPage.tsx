@@ -86,6 +86,17 @@ export function PracticeRoomPage({ onExit }: { onExit: () => void }) {
         </div>
         {error && <Banner kind="error">{error}</Banner>}
         <NameStep onGo={join} busy={busy} />
+        <p className="text-center text-sm text-neutral-500">
+          Playing in a room together?{" "}
+          <a
+            href="#/live/test/screen"
+            target="_blank"
+            rel="noreferrer"
+            className="font-semibold text-violet-700 underline"
+          >
+            Put the game on a big screen
+          </a>
+        </p>
       </main>
     </div>
   );

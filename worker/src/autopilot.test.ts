@@ -25,10 +25,12 @@ import {
   nextDeadline,
   playerAction,
   playerView,
+  presentation,
   scores,
   tick,
   validateSettings,
   validateShow,
+  watchView,
   type Effects,
   type RoomState,
 } from "./engine";
@@ -271,6 +273,63 @@ describe("house ducks", () => {
     expect(room.segments).toHaveLength(expandShow(PRACTICE_SHOW).length);
     until(room, now, here, () => room.phase === "lobby");
     expect(Object.keys(room.players)).toEqual(["p1"]);
+  });
+});
+
+describe("projector screen", () => {
+  it("sees a debate as players do: nobody's own answers, and facts only once turned over", () => {
+    const room = createPracticeRoom("hostkey", t0);
+    addPlayer(room, { name: "Ann", teamId: null, duckHolderId: null, lookIndex: 0 }, "p1", "tok1", t0);
+    const here = new Set(["p1"]);
+    const look = (now: number) => {
+      const seen = watchView(room, here, now);
+      const ann = playerView(room, "p1", here, now);
+      expect(seen.segment).toEqual(ann.segment);
+      expect(seen.players).toEqual(ann.players);
+      const raw = JSON.stringify(seen);
+      const tokens = Object.values(room.players).map((p) => p.token);
+      for (const secret of [room.hostKey, ...tokens]) expect(raw).not.toContain(secret);
+      for (const key of ['"me":', '"myAnswer":', '"myAward":', '"fullSegment":', '"submissions":']) {
+        expect(raw).not.toContain(key);
+      }
+      return raw;
+    };
+
+    let now = until(room, t0, here, () => {
+      const seg = currentSegment(room);
+      return seg?.kind === "question" && seg.question.id === "d-hotdog" && room.run?.stage === "open";
+    });
+    const seg = currentSegment(room);
+    const q = seg?.kind === "question" && seg.question.type === "debate" ? seg.question : null;
+    const facts = q?.facts?.map((f) => f.text) ?? [];
+    expect(facts.length).toBeGreaterThan(0);
+    const argued = Object.values(room.run!.submissions).map((s) => (s.value.type === "debate" ? s.value.text : ""));
+    expect(argued.length).toBeGreaterThan(0);
+    // Open: the house have argued, but neither their words nor the facts show.
+    let raw = look(now);
+    for (const text of [...facts, ...argued]) expect(raw).not.toContain(text);
+    // The house have answered and Ann hasn't: "4 / 5", not "4 / 1".
+    const open = watchView(room, here, now).segment!;
+    expect(open.answeredCount).toBe(argued.length);
+    expect(open.eligibleCount).toBe(argued.length + 1);
+
+    // Read out one at a time: a fact shows once an argument read so far turned it over.
+    now = until(room, now, here, () => room.run?.stage === "revealed");
+    let steps = 0;
+    for (let p = presentation(room); p; p = presentation(room)) {
+      raw = look(now);
+      const read = new Set(p.order.slice(0, p.shown));
+      room.run!.reveal!.facts?.forEach((f, i) => {
+        if (!f.uncoveredBy.some((id) => read.has(id))) expect(raw, `step ${p!.shown}`).not.toContain(facts[i]);
+      });
+      steps++;
+      const shown = p.shown;
+      now = until(room, now, here, () => presentation(room)?.shown !== shown);
+    }
+    expect(steps).toBe(4);
+    // The result is up: everything players see, still nothing of their own.
+    raw = look(now);
+    expect(raw).toContain(facts[0]);
   });
 });
 

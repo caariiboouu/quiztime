@@ -19,7 +19,7 @@ export type RoomStatus =
   /** The room exists but won't accept these credentials. */
   | "rejected";
 
-type Cred = { host: string } | { token: string };
+type Cred = { host: string } | { token: string } | { watch: true };
 
 /**
  * Keeps a WebSocket to the room open (reconnecting with backoff) and exposes
@@ -34,7 +34,7 @@ export function useRoom<V extends RoomView>(code: string, cred: Cred) {
   const wsRef = useRef<WebSocket | null>(null);
   // Arena positions arrive ~10×/s; keep them out of React state.
   const arenaRef = useRef<ArenaFeed>({ segmentId: null, snaps: [] });
-  const credKey = "host" in cred ? `h:${cred.host}` : `t:${cred.token}`;
+  const credKey = "host" in cred ? `h:${cred.host}` : "token" in cred ? `t:${cred.token}` : "w";
 
   useEffect(() => {
     let stopped = false;
@@ -87,7 +87,8 @@ export function useRoom<V extends RoomView>(code: string, cred: Cred) {
         }
         attempt++;
         // After a few failures, check whether the room still exists at all.
-        if (attempt >= 3) {
+        // A projector never gives up: connecting brings the practice room back.
+        if (attempt >= 3 && credKey !== "w") {
           try {
             await getRoomInfo(code);
             // Room is there but we've never gotten in: our seat is gone.

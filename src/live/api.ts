@@ -119,8 +119,10 @@ export const resetAccountPin = (id: string, password: string) =>
     body: JSON.stringify({ password }),
   });
 
-export function socketUrl(code: string, cred: { host: string } | { token: string }): string {
+/** `watch`: the practice room's projector (it only watches, and needs no seat). */
+export function socketUrl(code: string, cred: { host: string } | { token: string } | { watch: true }): string {
   const base = API_BASE.replace(/^http/, "ws");
+  if ("watch" in cred) return `${base}/api/practice/ws`;
   const q = "host" in cred ? `host=${encodeURIComponent(cred.host)}` : `token=${encodeURIComponent(cred.token)}`;
   return `${base}/api/rooms/${encodeURIComponent(code)}/ws?${q}`;
 }
